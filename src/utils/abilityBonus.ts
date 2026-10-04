@@ -89,6 +89,15 @@ const TECHNIQUE_QUALITY_BONUS: Record<string, number> = {
   神: 0.75, 神品: 0.75,
 }
 
+/** 功法排序用：品质序号×10 + 品级，用于 NPC 兜底时挑最强的一本 */
+function gradeRank(item: any): number {
+  const order = ['凡', '黄', '玄', '地', '天', '仙', '神']
+  const q = String(item?.品质?.quality || '').replace('品', '')
+  const qi = order.indexOf(q)
+  const g = Number(item?.品质?.grade)
+  return (qi < 0 ? 0 : qi + 1) * 10 + (Number.isFinite(g) ? g : 0)
+}
+
 /** 天资稀有度(1-10) → 资质加成比例 */
 function talentTierBonus(rarity: number): number {
   if (!Number.isFinite(rarity) || rarity <= 0) return 0
@@ -346,6 +355,17 @@ export function calculateAbilityBonus(source: unknown): AbilityBonus {
         totalRatio += r
         parts.push(describeTechnique(sub, entity.技能进度, r, '辅修'))
       }
+    }
+  } else if (!isPlayerEntity(entity) && entity.功法列表.length > 0) {
+    // NPC 有功法物品但没写 已装备/功法套装.主修：取品质最高的一本兜底
+    // （AI 常漏写装备标记，若严格按 已装备 判定会把已有功法白丢）
+    const best = entity.功法列表.slice().sort((a: any, b: any) => gradeRank(b) - gradeRank(a))[0]
+    mainRatio = techniqueRatio(best, entity.技能进度)
+    totalRatio = mainRatio
+    if (mainRatio > 0) {
+      parts.push(describeTechnique(best, entity.技能进度, mainRatio, '按品质取用·未标装备'))
+      diag.warn('能力·功法', `NPC 有功法但未标记装备，已按品质最高兜底取用`,
+        `${best?.名称}（${best?.品质?.quality}${best?.品质?.grade}品）；建议 AI 补 set 已装备=true 与 功法套装.主修`)
     }
   } else if (!isPlayerEntity(entity)) {
     // NPC 无功法数据：按境界推算其"应有功法"，避免玩家单方面吃满加成
