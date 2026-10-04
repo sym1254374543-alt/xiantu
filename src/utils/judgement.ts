@@ -5,7 +5,9 @@
  * 属性加权 = 主 × 0.5 + 副 × 0.3 + 辅 × 0.2
  * 基础值 = 底子 10 + 属性加权 + 境界加成
  * 判定值 = 基础值 + 幸运点 + 环境修正 + 状态修正
- * 有对手时基础不变，按对手强弱换难度档位。
+ * 难度 = f(事情本身)，不随角色能力变化
+ *
+ * 大道修为：前端提供大道信息，AI根据行动类型和大道匹配度调整难度（不调整基础值）
  */
 
 import { realmRank } from '@/utils/realmOrder'
@@ -49,6 +51,12 @@ export interface JudgementBaseLine {
   基础: number
 }
 
+export interface DaoStageInfo {
+  大道名: string
+  当前阶段: number
+  阶段名称: string
+}
+
 export interface JudgementRound {
   幸运点: number
   气运: number
@@ -64,6 +72,8 @@ export interface JudgementRound {
     战斗: number
   }
   分项: Record<string, JudgementBaseLine>
+  目标境界?: string  // 目标的境界（用于境界压制）
+  大道信息?: DaoStageInfo[]  // 大道阶段信息（用于炼制类加成）
 }
 
 const SIX_KEYS: SixSiKey[] = ['根骨', '灵性', '悟性', '气运', '魅力', '心性']
@@ -111,6 +121,46 @@ export function realmJudgementBonus(realmName: string): number {
   if (rank < REALM_BONUS_BY_RANK.length) return REALM_BONUS_BY_RANK[rank]
   const last = REALM_BONUS_BY_RANK.length - 1
   return REALM_BONUS_BY_RANK[last] + (rank - last) * 12
+}
+
+/**
+ * 计算境界压制后的实际基础值。
+ * 当对低境界目标行动时，高境界修士的基础值会降低，避免"渡劫修士对凡人做事仍然很难"的问题。
+ *
+ * @param selfBase 自己的原始基础值
+ * @param selfRealm 自己的境界名
+ * @param targetRealm 目标的境界名（可选，无目标时不压制）
+ * @param actionType 行动类型，用于判断是否需要压制
+ * @returns 压制后的基础值
+ */
+export function realmSuppressionBase(
+  selfBase: number,
+  selfRealm: string,
+  targetRealm?: string,
+  actionType?: string
+): number {
+  // 无目标或无需压制的行动类型：保持原基础值
+  if (!targetRealm) return selfBase
+
+  // 修炼、突破类行动不压制（越高越难是合理的）
+  if (actionType === '修炼' || actionType === '突破') return selfBase
+
+  const selfRank = realmRank(selfRealm)
+  const targetRank = realmRank(targetRealm)
+
+  // 无法识别境界或目标更高：不压制
+  if (selfRank < 0 || targetRank < 0 || selfRank <= targetRank) return selfBase
+
+  const rankDiff = selfRank - targetRank
+
+  // 每高一个大境界，基础值降低10点
+  const suppression = rankDiff * 10
+
+  // 但不能低于目标境界应有的基础值（避免过度压制）
+  const targetBaseFloor = BASE_FLOOR + (targetRank < REALM_BONUS_BY_RANK.length ? REALM_BONUS_BY_RANK[targetRank] : 0)
+
+  // 最终基础值 = 原基础值 - 压制，但不低于目标基础值
+  return Math.max(targetBaseFloor, selfBase - suppression)
 }
 
 /**
@@ -224,6 +274,8 @@ export function buildJudgementRound(input: {
   效果?: unknown
   灵气浓度?: unknown
   random?: () => number
+  目标境界?: string  // 目标的境界名，用于境界压制
+  大道?: unknown  // 新增：大道数据，用于炼制类加成
 }): JudgementRound {
   const innate = readSix(input.先天六司, 5)
   const acquired = readSix(input.后天六司, 0)
@@ -234,11 +286,35 @@ export function buildJudgementRound(input: {
   const realmBonus = realmJudgementBonus(realmName)
   const density = num(input.灵气浓度, 50)
 
+  // 提取大道信息用于提示词展示
+  const daoInfoList: DaoStageInfo[] = []
+  if (Array.isArray(input.大道)) {
+    for (const dao of input.大道) {
+      if (!dao || typeof dao !== 'object') continue
+      const daoName = String((dao as { 道名?: unknown }).道名 || '')
+      const stage = Number((dao as { 当前阶段?: unknown }).当前阶段 ?? 0)
+      const stageList = (dao as { 阶段列表?: unknown[] }).阶段列表
+      const stageName = Array.isArray(stageList) && stageList[stage]
+        ? String((stageList[stage] as { 名称?: unknown }).名称 || '')
+        : ''
+      if (daoName) {
+        daoInfoList.push({ 大道名: daoName, 当前阶段: stage, 阶段名称: stageName })
+      }
+    }
+  }
+
   const 分项: Record<string, JudgementBaseLine> = {}
   for (const [type, weights] of Object.entries(TYPE_WEIGHTS)) {
     if (type === '战斗') continue
     const weighted = Math.round(weightedAttribute(attrs, weights))
-    分项[type] = { 属性加权: weighted, 基础: BASE_FLOOR + weighted + realmBonus }
+
+    // 基础值 = 底子 + 属性加权 + 境界加成（不再自动加大道加成）
+    const rawBase = BASE_FLOOR + weighted + realmBonus
+
+    // 应用境界压制（修炼和突破类不压制）
+    const actualBase = realmSuppressionBase(rawBase, realmName, input.目标境界, type)
+
+    分项[type] = { 属性加权: weighted, 基础: actualBase }
   }
 
   return {
@@ -256,6 +332,8 @@ export function buildJudgementRound(input: {
       战斗: environmentModifier(density, '战斗'),
     },
     分项,
+    目标境界: input.目标境界,
+    大道信息: daoInfoList.length > 0 ? daoInfoList : undefined,
   }
 }
 
@@ -291,12 +369,23 @@ export function formatJudgementBlock(round: JudgementRound): string {
     const bands = difficultyBands(group.base)
     return `- ${group.types.join('、')}: 判定值${group.value}，基础${group.base}，环境${signed(group.env)}。简单难度${bands.简单}→${group.easy}，普通难度${bands.普通}→${group.normal}`
   })
+
+  // 境界压制说明
+  const suppressionNote = round.目标境界
+    ? `\n【境界压制】你是${round.境界名}，目标是${round.目标境界}。上述基础值已根据境界差自动调整（战斗、社交、探索、感知、逃跑适用；修炼、突破不适用）。`
+    : ''
+
+  // 大道阶段说明
+  const daoNote = round.大道信息 && round.大道信息.length > 0
+    ? `\n【大道修为】当前大道：${round.大道信息.map(d => `${d.大道名}(阶段${d.当前阶段}${d.阶段名称 ? '-' + d.阶段名称 : ''})`).join('、')}。炼制类行动需根据大道匹配度调整难度（详见业务规则）。阶段0-5分别对应凡、黄、玄、地、天、仙品的炼制能力。`
+    : ''
+
   return `# 本回合判定（数值已掷好，禁止重算，禁止改结果）
 幸运${signed(round.幸运点)}，状态${signed(round.状态修正)}。判定值 = 基础 + 幸运 + 环境 + 状态。〔〕里必须写上幸运。
 本境界正常行事（修炼、赶路、打听、对等交手、炼制当前境界能接触的物品）用简单难度。普通只用于明确偏难但仍在本境界内的事。
 判定值 ≥ 所选难度就必须写成功、大成功或完美，禁止改成失败。只有越级、条件不足的强行突破、硬闯才用困难及以上。
 困难=基础+3，艰难=基础+6，极难=基础+9。禁止使用 10/20/35/50/70/90 这类固定难度。
-境界：${round.境界名}。凡人没有初期/中期/后期。
+境界：${round.境界名}。凡人没有初期/中期/后期。${suppressionNote}${daoNote}
 ${lines.join('\n')}
 有明确对手时：基础不变，按对手强弱选难度。对手弱一个大境界及以上免判；弱一两个小阶段=简单；同阶=普通；高一个小阶段=困难；高两个小阶段=艰难；高一个大境界=极难；高两个大境界及以上免判，只能逃、躲、求饶。逃跑比正面交手低两档。
 失败是吃亏，不是死：失败最多轻伤，大失败才重伤；气血 25% 以上时一次判定不会致死；濒死时也要留活路（逃脱、昏迷被救、被俘），除非玩家执意送死。`

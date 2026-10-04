@@ -1,6 +1,6 @@
 import type { InnateAttributes, Item, Equipment, SaveData } from '@/types/game';
 import type { Talent } from '../types/index';
-import { LOCAL_TALENTS } from '../data/creationData';
+import { LOCAL_TALENTS, LOCAL_ORIGINS } from '../data/creationData';
 
 /**
  * 中文键名到英文键名的映射（用于组件传参）
@@ -86,6 +86,9 @@ export function calculateTalentBonusesFromCharacter(saveData: SaveData): InnateA
   const character = (saveData as any).角色?.身份 ?? null;
   const characterTalents = character?.天赋 || [];
 
+  console.log('[天赋加成计算] 开始计算天赋加成');
+  console.log('[天赋加成计算] 角色天赋列表:', characterTalents);
+
   // 提取天赋名称，兼容字符串数组和对象数组两种格式
   const characterTalentNames: string[] = characterTalents.map((talent: any) => {
     if (typeof talent === 'string') {
@@ -96,8 +99,10 @@ export function calculateTalentBonusesFromCharacter(saveData: SaveData): InnateA
     return null;
   }).filter(Boolean);
 
+  console.log('[天赋加成计算] 提取的天赋名称:', characterTalentNames);
+
   // 遍历角色的每个天赋
-  characterTalents.forEach((talent: any) => {
+  characterTalents.forEach((talent: any, index: number) => {
     let talentData: Talent | undefined;
     let talentName: string;
 
@@ -105,13 +110,16 @@ export function calculateTalentBonusesFromCharacter(saveData: SaveData): InnateA
       talentName = talent;
       // 在LOCAL_TALENTS中查找对应的天赋数据
       talentData = LOCAL_TALENTS.find(t => t.name === talentName);
+      console.log(`[天赋加成计算] 天赋${index + 1}: "${talentName}" (字符串格式), 找到数据:`, !!talentData);
     } else if (talent && typeof talent === 'object') {
       talentName = talent.名称 || '';
       // 先尝试在LOCAL_TALENTS中查找
       talentData = LOCAL_TALENTS.find(t => t.name === talentName);
+      console.log(`[天赋加成计算] 天赋${index + 1}: "${talentName}" (对象格式), 在LOCAL_TALENTS中找到:`, !!talentData);
 
       // 如果找不到预定义天赋，但天赋对象本身有effects，直接使用
       if (!talentData && talent.effects) {
+        console.log(`[天赋加成计算] 使用天赋对象自带的effects:`, talent.effects);
         talentData = {
           id: 0,
           name: talentName,
@@ -124,16 +132,21 @@ export function calculateTalentBonusesFromCharacter(saveData: SaveData): InnateA
     }
 
     if (talentData && talentData.effects) {
+      console.log(`[天赋加成计算] 处理天赋 "${talentName}" 的effects:`, talentData.effects);
       // 使用现有的calculateTalentBonuses函数处理单个天赋
       const singleTalentBonuses = calculateTalentBonuses([talentData]);
+      console.log(`[天赋加成计算] 天赋 "${talentName}" 计算出的加成:`, singleTalentBonuses);
 
       // 累加到总bonuses中
       Object.keys(bonuses).forEach(attr => {
         bonuses[attr as keyof InnateAttributes] += singleTalentBonuses[attr as keyof InnateAttributes];
       });
+    } else {
+      console.warn(`[天赋加成计算] 天赋 "${talentName}" 没有找到数据或没有effects`);
     }
   });
 
+  console.log('[天赋加成计算] 最终天赋加成:', bonuses);
   return bonuses;
 }
 
@@ -203,6 +216,70 @@ export function calculateTalentBonuses(talents: Talent[]): InnateAttributes {
 }
 
 /**
+ * 计算出身提供的后天六司加成
+ */
+export function calculateOriginBonuses(saveData: SaveData): InnateAttributes {
+  const bonuses: InnateAttributes = {
+    根骨: 0,
+    灵性: 0,
+    悟性: 0,
+    气运: 0,
+    魅力: 0,
+    心性: 0
+  };
+
+  // 获取角色的出身
+  const character = (saveData as any).角色?.身份 ?? null;
+  const originName = character?.出身 || '';
+
+  console.log('[出身加成计算] 开始计算出身加成');
+  console.log('[出身加成计算] 出身名称:', originName);
+
+  if (!originName) {
+    console.log('[出身加成计算] 没有出身信息');
+    return bonuses;
+  }
+
+  // 在LOCAL_ORIGINS中查找出身数据
+  const originData = LOCAL_ORIGINS.find(o => o.name === originName);
+
+  if (!originData) {
+    console.warn(`[出身加成计算] 未找到出身 "${originName}" 的数据`);
+    return bonuses;
+  }
+
+  console.log('[出身加成计算] 找到出身数据:', originData);
+
+  // 应用出身的属性修正
+  if (originData.attribute_modifiers) {
+    const modifiers = originData.attribute_modifiers;
+    console.log('[出身加成计算] 属性修正:', modifiers);
+
+    // 英文键名到中文键名的映射
+    const attrMap: Record<string, keyof InnateAttributes> = {
+      'root_bone': '根骨',
+      'spirituality': '灵性',
+      'comprehension': '悟性',
+      'fortune': '气运',
+      'luck': '气运',  // 兼容另一种命名
+      'charm': '魅力',
+      'temperament': '心性'
+    };
+
+    for (const [englishKey, value] of Object.entries(modifiers)) {
+      const chineseKey = attrMap[englishKey];
+      if (chineseKey && typeof value === 'number') {
+        bonuses[chineseKey] += value;
+        console.log(`[出身加成计算] ${chineseKey} +${value}`);
+      }
+    }
+  }
+
+  console.log('[出身加成计算] 最终出身加成:', bonuses);
+  return bonuses;
+}
+
+/**
  * 计算当前修炼/已装备功法提供的属性加成
  */
 export function calculateTechniqueBonuses(saveData: SaveData): InnateAttributes {
@@ -252,28 +329,31 @@ export function calculateFinalAttributes(
     根骨: 0, 灵性: 0, 悟性: 0, 气运: 0, 魅力: 0, 心性: 0
   };
 
-  // 2. 计算装备加成（实时计算，确保准确）
+  // 2. 计算出身加成
+  const originBonuses = calculateOriginBonuses(saveData);
+
+  // 3. 计算装备加成（实时计算，确保准确）
   const equipmentState = (saveData as any).角色?.装备 ?? null;
   const inventoryState = (saveData as any).角色?.背包 ?? null;
   const equipmentBonuses = calculateEquipmentBonuses(equipmentState, inventoryState);
 
-  // 3. 计算天赋加成
+  // 4. 计算天赋加成
   const talentBonuses = calculateTalentBonusesFromCharacter(saveData);
 
-  // 4. 计算已装备功法加成
+  // 5. 计算已装备功法加成
   const techniqueBonuses = calculateTechniqueBonuses(saveData);
 
-  // 5. 合并所有后天加成
+  // 6. 合并所有后天加成
   const totalAcquiredAttributes: InnateAttributes = {
-    根骨: storedAcquiredAttributes.根骨 + equipmentBonuses.根骨 + talentBonuses.根骨 + techniqueBonuses.根骨,
-    灵性: storedAcquiredAttributes.灵性 + equipmentBonuses.灵性 + talentBonuses.灵性 + techniqueBonuses.灵性,
-    悟性: storedAcquiredAttributes.悟性 + equipmentBonuses.悟性 + talentBonuses.悟性 + techniqueBonuses.悟性,
-    气运: storedAcquiredAttributes.气运 + equipmentBonuses.气运 + talentBonuses.气运 + techniqueBonuses.气运,
-    魅力: storedAcquiredAttributes.魅力 + equipmentBonuses.魅力 + talentBonuses.魅力 + techniqueBonuses.魅力,
-    心性: storedAcquiredAttributes.心性 + equipmentBonuses.心性 + talentBonuses.心性 + techniqueBonuses.心性,
+    根骨: storedAcquiredAttributes.根骨 + originBonuses.根骨 + equipmentBonuses.根骨 + talentBonuses.根骨 + techniqueBonuses.根骨,
+    灵性: storedAcquiredAttributes.灵性 + originBonuses.灵性 + equipmentBonuses.灵性 + talentBonuses.灵性 + techniqueBonuses.灵性,
+    悟性: storedAcquiredAttributes.悟性 + originBonuses.悟性 + equipmentBonuses.悟性 + talentBonuses.悟性 + techniqueBonuses.悟性,
+    气运: storedAcquiredAttributes.气运 + originBonuses.气运 + equipmentBonuses.气运 + talentBonuses.气运 + techniqueBonuses.气运,
+    魅力: storedAcquiredAttributes.魅力 + originBonuses.魅力 + equipmentBonuses.魅力 + talentBonuses.魅力 + techniqueBonuses.魅力,
+    心性: storedAcquiredAttributes.心性 + originBonuses.心性 + equipmentBonuses.心性 + talentBonuses.心性 + techniqueBonuses.心性,
   };
 
-  // 6. 计算最终属性（先天 + 后天）
+  // 7. 计算最终属性（先天 + 后天）
   const finalAttributes: InnateAttributes = {
     根骨: innateAttributes.根骨 + totalAcquiredAttributes.根骨,
     灵性: innateAttributes.灵性 + totalAcquiredAttributes.灵性,
