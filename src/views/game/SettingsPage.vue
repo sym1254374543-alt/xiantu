@@ -195,6 +195,28 @@
               <span>性能监控<small>监控组件性能和加载时间</small></span>
               <label class="gm-switch"><input v-model="set.performanceMonitor" type="checkbox" aria-label="性能监控" /><span></span></label>
             </div>
+
+            <!-- 运行诊断：数值未匹配、走保底等情况在此展开查看（手机端无需控制台） -->
+            <div class="c-row sub diag-row">
+              <button type="button" class="diag-toggle" @click="diagOpen = !diagOpen">
+                <span class="diag-title">
+                  运行诊断
+                  <SealBadge v-if="diagItems.length" tone="gold">{{ diagItems.length }}</SealBadge>
+                </span>
+                <small>{{ diagOpen ? '点击收起' : '数值未匹配、走保底等情况' }}</small>
+              </button>
+              <button v-if="diagItems.length" type="button" class="diag-clear" @click="clearDiag">清空</button>
+            </div>
+            <div v-if="diagOpen" class="diag-panel">
+              <p v-if="!diagItems.length" class="diag-empty">暂无诊断信息——说明数值都匹配上了。</p>
+              <ul v-else class="diag-list">
+                <li v-for="(d, i) in diagItems" :key="i" :class="'lv-' + d.level">
+                  <span class="diag-scope">{{ d.scope }}</span>
+                  <span class="diag-msg">{{ d.message }}</span>
+                  <span v-if="d.detail" class="diag-detail">{{ d.detail }}</span>
+                </li>
+              </ul>
+            </div>
           </template>
         </section>
 
@@ -234,8 +256,23 @@ import RangeSlider from '@/components/common/RangeSlider.vue';
 import PageTabs from '@/components/game/PageTabs.vue';
 import SealBadge from '@/components/game/SealBadge.vue';
 import TextReplaceRulesModal from '@/components/common/TextReplaceRulesModal.vue';
+import { diagnostics } from '@/utils/diagnostics';
+import { onUnmounted } from 'vue';
 
 defineOptions({ name: 'SettingsPage' });
+
+// ─── 运行诊断：可展开查看数值未匹配/走保底等情况（手机端无需控制台）───
+const diagOpen = ref(false);
+const diagVersion = ref(diagnostics.version);
+const unsubscribeDiag = diagnostics.subscribe(() => {
+  diagVersion.value = diagnostics.version;
+});
+onUnmounted(unsubscribeDiag);
+const diagItems = computed(() => {
+  void diagVersion.value; // 依赖 version 触发更新
+  return diagnostics.list();
+});
+const clearDiag = () => diagnostics.clear();
 
 const THEMES: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
   { value: 'dark', label: '暗夜', icon: Moon },
@@ -378,6 +415,105 @@ usePageActions([
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+}
+
+/* ─── 运行诊断 ─── */
+.diag-row {
+  align-items: center;
+}
+
+.diag-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.diag-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 14px;
+}
+
+.diag-toggle small {
+  font-size: 12px;
+  color: var(--cc-text-2);
+}
+
+.diag-clear {
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--cc-border, rgba(255, 255, 255, 0.15));
+  border-radius: 4px;
+  background: none;
+  color: var(--cc-text-2);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.diag-panel {
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.diag-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--cc-text-2);
+}
+
+.diag-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.diag-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  padding-left: 0.5rem;
+  border-left: 2px solid var(--cc-text-2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.diag-list li.lv-info {
+  border-left-color: #63b3ed;
+}
+
+.diag-list li.lv-warn {
+  border-left-color: #daa520;
+}
+
+.diag-list li.lv-error {
+  border-left-color: #f56565;
+}
+
+.diag-scope {
+  font-weight: 600;
+  color: var(--cc-gold);
+}
+
+.diag-msg {
+  color: var(--cc-text-1, inherit);
+}
+
+.diag-detail {
+  color: var(--cc-text-2);
+  word-break: break-all;
 }
 
 .c-row > div {

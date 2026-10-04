@@ -11,6 +11,8 @@
  */
 
 import { realmRank } from '@/utils/realmOrder'
+import { calculateAbilityBonus, type AbilityActionType, type AbilityBonus } from '@/utils/abilityBonus'
+import { diag } from '@/utils/diagnostics'
 
 export type SixSiKey = '根骨' | '灵性' | '悟性' | '气运' | '魅力' | '心性'
 
@@ -48,6 +50,16 @@ const BASE_FLOOR = 10
 
 /** 与境界序号对齐：凡人0 … 渡劫9。同序号的武道境界共用这一档。 */
 const REALM_BONUS_BY_RANK = [0, 5, 12, 20, 30, 42, 55, 70, 79, 88]
+
+/** 难度下限：无论怎么叠加减免，难度不得低于此值 */
+export const MIN_DIFFICULTY = 1
+
+/** 难度统一收敛：取整且不低于下限，避免出现 0 或负数 */
+export function clampDifficulty(value: number): number {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n)) return MIN_DIFFICULTY
+  return Math.max(MIN_DIFFICULTY, n)
+}
 
 /** 大道阶段对应的炼制基础值：阶段0-5对应凡黄玄地天仙的上品难度
  * 阶段6及以上：超越仙品，使用仙品基础值+额外加成 */
@@ -93,6 +105,10 @@ export interface JudgementRound {
   分项: Record<string, JudgementBaseLine>
   目标境界?: string  // 目标的境界（用于境界压制）
   大道信息?: DaoStageInfo[]  // 大道阶段信息（用于炼制类加成）
+  能力来源?: AbilityBonus['来源']  // 能力加成逐项来源（供展示/AI参考）
+  资质来源?: string[]  // 灵根/天资资质来源
+  功法来源?: string[]  // 主修功法加成来源
+  对手列表?: string[]  // 各NPC战斗基础值（含其功法/天赋），用作战斗难度
 }
 
 const SIX_KEYS: SixSiKey[] = ['根骨', '灵性', '悟性', '气运', '魅力', '心性']
@@ -139,7 +155,7 @@ export function getCraftingDifficulty(quality: QualityType, grade: GradeType = '
     console.warn(`[getCraftingDifficulty] 未知品级: ${grade}`)
     return qualityRow['中品']  // 降级到中品
   }
-  return difficulty
+  return clampDifficulty(difficulty)
 }
 
 /**
@@ -148,7 +164,7 @@ export function getCraftingDifficulty(quality: QualityType, grade: GradeType = '
  * @returns 战斗难度
  */
 export function getCombatDifficulty(opponentBase: number): number {
-  return opponentBase
+  return clampDifficulty(opponentBase)
 }
 
 /**
@@ -157,7 +173,7 @@ export function getCombatDifficulty(opponentBase: number): number {
  * @returns 逃跑难度
  */
 export function getEscapeDifficulty(opponentBase: number): number {
-  return Math.round(opponentBase * 0.7)
+  return clampDifficulty(opponentBase * 0.7)
 }
 
 /**
@@ -183,7 +199,7 @@ export function getSocialDifficulty(
   if (hasInterest) difficulty += hasInterest
   if (hasThreat) difficulty -= 20
   if (isHostile) difficulty += 30
-  return Math.max(5, difficulty)
+  return clampDifficulty(difficulty)
 }
 
 /**
@@ -192,7 +208,7 @@ export function getSocialDifficulty(
  * @returns 修炼难度
  */
 export function getCultivationDifficulty(ownBase: number): number {
-  return Math.round(ownBase * 0.5)
+  return clampDifficulty(ownBase * 0.5)
 }
 
 /** 突破难度表：目标境界 → {小阶段突破，大境界突破} */
@@ -225,7 +241,7 @@ export function getBreakthroughDifficulty(
     return 50
   }
   const baseDifficulty = isMajor ? config.major : config.small
-  return Math.max(10, baseDifficulty + conditionBonus)
+  return clampDifficulty(baseDifficulty + conditionBonus)
 }
 
 /**
@@ -237,21 +253,21 @@ export function getBreakthroughDifficulty(
 export function getExploreDifficulty(targetType: '普通搜索' | '隐藏物品' | '破解阵法' | '感知NPC' | '洞悉宝物', targetLevel?: number | string): number {
   switch (targetType) {
     case '普通搜索':
-      return 15
+      return clampDifficulty(15)
     case '隐藏物品':
-      return 30
+      return clampDifficulty(30)
     case '破解阵法':
       if (typeof targetLevel === 'string') {
         const formationDifficulty: Record<string, number> = { '黄品': 25, '玄品': 45, '地品': 70, '天品': 100 }
-        return formationDifficulty[targetLevel] || 45
+        return clampDifficulty(formationDifficulty[targetLevel] || 45)
       }
-      return 45
+      return clampDifficulty(45)
     case '感知NPC':
-      return typeof targetLevel === 'number' ? targetLevel : 20
+      return clampDifficulty(typeof targetLevel === 'number' ? targetLevel : 20)
     case '洞悉宝物':
-      return typeof targetLevel === 'string' ? getCraftingDifficulty(targetLevel as QualityType) : 30
+      return typeof targetLevel === 'string' ? getCraftingDifficulty(targetLevel as QualityType) : clampDifficulty(30)
     default:
-      return 25
+      return clampDifficulty(25)
   }
 }
 
@@ -466,6 +482,115 @@ function findMatchingDaoStage(daoList: DaoStageInfo[], craftType: string): numbe
   return best
 }
 
+/**
+ * 统一的能力加成应用：技能加成 + 功法加成 按类型生效；资质加成作用于修炼/突破/炼制。
+ * 玩家与对手（NPC）走同一套公式，保证双方对等。
+ */
+function applyAbilityBonus(
+  bonus: AbilityBonus,
+  type: string,
+  base: number
+): number {
+  let ratio = 0
+  ratio += bonus.技能加成[type as AbilityActionType] || 0
+  ratio += bonus.功法加成[type as AbilityActionType] || 0
+  if (type === '修炼' || type === '突破' || type in CRAFT_DAO_KEYWORDS) {
+    ratio += bonus.资质加成
+  }
+  if (ratio === 0) return base
+  return Math.round(base * (1 + ratio))
+}
+
+/** 位置描述的前两层（大陆·地点），用于判断是否同处一地 */
+function locationArea(desc: unknown): string {
+  const text = String(desc || '').trim()
+  if (!text) return ''
+  const parts = text.split('·')
+  return parts.slice(0, 2).join('·')
+}
+
+/**
+ * 筛选当前场景/附近的 NPC。
+ * 位置描述按「大陆·地点·建筑」分层，前两层相同即视为附近；
+ * 若没有同地 NPC（独处/荒野），退化为取好感度最高的少数几人，
+ * 保证判定块不会因 NPC 数量增长而无限膨胀。
+ */
+function pickNearbyNpcs(npcList: unknown, playerPos: any, limit = 8): any[] {
+  if (!Array.isArray(npcList)) return []
+  const npcs = npcList.filter((n) => n && typeof n === 'object')
+  const playerArea = locationArea(playerPos?.描述)
+
+  if (playerArea) {
+    const same = npcs.filter((n) => locationArea((n as any).当前位置?.描述) === playerArea)
+    if (same.length > 0) {
+      return same
+        .sort((a: any, b: any) => Math.abs(Number(b.好感度) || 0) - Math.abs(Number(a.好感度) || 0))
+        .slice(0, limit)
+    }
+  }
+
+  // 独处：按关系密切度取前几名，仅作参考
+  return npcs
+    .slice()
+    .sort((a: any, b: any) => Math.abs(Number(b.好感度) || 0) - Math.abs(Number(a.好感度) || 0))
+    .slice(0, Math.min(3, limit))
+}
+
+/**
+ * 未建档单位（散修/妖兽/路人）的战斗基准：
+ * 用与 entityBaseValue 相同的公式推导——10 + 典型六司(5) + 境界加成，再乘该境界典型功法系数。
+ * 保持与实体公式同源，避免两套数字打架。
+ */
+const REALM_TYPICAL_QUALITY: Record<string, string> = {
+  凡人: '凡', 练气: '黄', 筑基: '玄', 金丹: '地',
+  元婴: '天', 化神: '天', 炼虚: '天', 合体: '天', 渡劫: '仙',
+}
+
+/** 各品质功法的典型加成（与 abilityBonus 同源数值的低档估计） */
+const ABILITY_TYPICAL_TECHNIQUE: Record<string, number> = {
+  凡: 0.04, 黄: 0.10, 玄: 0.18, 地: 0.28, 天: 0.40, 仙: 0.55, 神: 0.75,
+}
+
+export function unlistedCombatBaseline(realmName: string): number {
+  const rank = realmRank(realmName)
+  if (rank < 0) return 0
+  const realmBonus = rank < REALM_BONUS_BY_RANK.length
+    ? REALM_BONUS_BY_RANK[rank]
+    : REALM_BONUS_BY_RANK[REALM_BONUS_BY_RANK.length - 1] + (rank - REALM_BONUS_BY_RANK.length + 1) * 12
+  const base = BASE_FLOOR + 5 + realmBonus  // 典型六司按 5 估
+  return clampDifficulty(base * (1 + (ABILITY_TYPICAL_TECHNIQUE[REALM_TYPICAL_QUALITY[realmName]] || 0)))
+}
+
+/** 生成「未建档单位」的战斗基准参考表（一行） */
+export function unlistedBaselineTable(): string {
+  const realms = ['凡人', '练气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '渡劫']
+  return realms.map((r) => `${r}${unlistedCombatBaseline(r)}`).join('|')
+}
+
+/**
+ * 计算任意实体（玩家或 NPC）在指定类型上的能力基础值。
+ * 与玩家的基础值公式完全一致，因此可直接用作对手强度（战斗难度）。
+ *
+ * @param entity 实体数据：玩家存档 或 NPC 对象
+ * @param type 判定类型（战斗攻/战斗防/修炼/感知/…）
+ * @returns 该实体的能力基础值
+ */
+export function entityBaseValue(entity: unknown, type: string): number {
+  const src = entity as any
+  if (!src || typeof src !== 'object') return 0
+
+  const identity = src.角色?.身份
+  const sixRaw = identity?.先天六司 ?? src.先天六司 ?? null
+  const six = readSix(sixRaw, 5)
+  const realm = realmNameOf(identity ? src.角色?.属性 : src)
+  const realmBonus = realmJudgementBonus(realm)
+  const weights = TYPE_WEIGHTS[type] || TYPE_WEIGHTS['战斗攻']
+  const weighted = Math.round(weightedAttribute(six, weights))
+
+  const base = BASE_FLOOR + weighted + realmBonus
+  return applyAbilityBonus(calculateAbilityBonus(entity), type, base)
+}
+
 export function buildJudgementRound(input: {
   先天六司?: unknown
   后天六司?: unknown
@@ -474,7 +599,9 @@ export function buildJudgementRound(input: {
   灵气浓度?: unknown
   random?: () => number
   目标境界?: string  // 目标的境界名，用于境界压制
-  大道?: unknown  // 新增：大道数据，用于炼制类加成
+  大道?: unknown  // 大道数据，用于炼制类基础值
+  存档?: unknown  // 存档数据，用于读取天赋技能加成 / 灵根 / 天资 / 功法
+  对手列表?: unknown  // NPC 列表，用于计算对等的战斗难度
 }): JudgementRound {
   const innate = readSix(input.先天六司, 5)
   const acquired = readSix(input.后天六司, 0)
@@ -484,6 +611,9 @@ export function buildJudgementRound(input: {
   const realmName = realmNameOf(input.属性)
   const realmBonus = realmJudgementBonus(realmName)
   const density = num(input.灵气浓度, 50)
+
+  // 能力加成（天赋技能/特殊能力、灵根、天资）
+  const ability: AbilityBonus = calculateAbilityBonus((input.存档 ?? {}) as any)
 
   // 提取大道信息用于提示词展示
   const daoInfoList: DaoStageInfo[] = []
@@ -504,8 +634,11 @@ export function buildJudgementRound(input: {
     }
   }
 
-  console.log('[判定系统] 提取大道数据，原始input.大道:', input.大道)
-  console.log('[判定系统] 转换后的daoList:', daoList)
+  // 数据异常记入诊断（手机端看不到控制台，走界面展示）
+  if (daoList.length === 0) {
+    diag.warn('判定·大道', '未读取到任何大道数据，炼制类将全部走保底基础值(5)',
+      `input.大道=${input.大道 === undefined ? 'undefined' : typeof input.大道}`)
+  }
 
   for (const dao of daoList) {
     if (!dao || typeof dao !== 'object') continue
@@ -536,9 +669,10 @@ export function buildJudgementRound(input: {
       const matchedStage = findMatchingDaoStage(daoInfoList, type)
       if (matchedStage >= 0) {
         const daoBase = getDaoStageBase(matchedStage)
+        const base = Math.round(daoBase + realmBonus * 0.3)
         分项[type] = {
           属性加权: weighted,
-          基础: Math.round(daoBase + realmBonus * 0.3),
+          基础: applyAbilityBonus(ability, type, base),
           大道阶段: matchedStage,
         }
       } else {
@@ -548,6 +682,8 @@ export function buildJudgementRound(input: {
           基础: 5,
           炼制提示: CRAFT_DAO_HINT[type],
         }
+        diag.info('判定·炼制', `${type} 无匹配大道，基础值走保底 5（几乎必败）`,
+          daoInfoList.length ? `已有大道：${daoInfoList.map((d) => d.大道名).join('、')}` : '大道列表为空')
       }
       continue
     }
@@ -555,7 +691,23 @@ export function buildJudgementRound(input: {
     // 其他类型：基础值 = 底子 + 属性加权 + 境界加成
     const rawBase = BASE_FLOOR + weighted + realmBonus
     const actualBase = realmSuppressionBase(rawBase, realmName, input.目标境界, type)
-    分项[type] = { 属性加权: weighted, 基础: actualBase }
+    分项[type] = { 属性加权: weighted, 基础: applyAbilityBonus(ability, type, actualBase) }
+  }
+
+  // 对手强度：只列当前场景/附近的 NPC，与玩家同公式计算
+  const opponentLines: string[] = []
+  const playerPos = (input.存档 as any)?.角色?.位置
+  const nearby = pickNearbyNpcs(input.对手列表, playerPos)
+  for (const npc of nearby) {
+    const name = String(npc.名字 || npc.名称 || '')
+    if (!name) continue
+    const realm = String(npc.境界?.名称 || '未知')
+    const stage = String(npc.境界?.阶段 || '')
+    const atk = clampDifficulty(entityBaseValue(npc, '战斗攻'))
+    const def = clampDifficulty(entityBaseValue(npc, '战斗防'))
+    const favor = Number(npc.好感度)
+    const favorText = Number.isFinite(favor) ? ` 好感${favor}` : ''
+    opponentLines.push(`- ${name}（${realm}${stage}）：战斗攻${atk} / 战斗防${def}${favorText}`)
   }
 
   return {
@@ -575,6 +727,10 @@ export function buildJudgementRound(input: {
     分项,
     目标境界: input.目标境界,
     大道信息: daoInfoList.length > 0 ? daoInfoList : undefined,
+    能力来源: ability.来源.length > 0 ? ability.来源 : undefined,
+    资质来源: ability.资质来源.length > 0 ? ability.资质来源 : undefined,
+    功法来源: ability.功法来源.length > 0 ? ability.功法来源 : undefined,
+    对手列表: opponentLines.length > 0 ? opponentLines : undefined,
   }
 }
 
@@ -615,15 +771,38 @@ export function formatJudgementBlock(round: JudgementRound): string {
     ? `\n【大道修为】${round.大道信息.map(d => `${d.大道名}阶段${d.当前阶段}${d.阶段名称 ? '(' + d.阶段名称 + ')' : ''}`).join('、')}`
     : ''
 
+  // 能力加成说明（已计入上方基础值）
+  const abilityNote = round.能力来源 && round.能力来源.length > 0
+    ? `\n【已有能力加成】(已计入基础值)\n${round.能力来源.map(s => `- ${s.名称}·${s.类型}：${s.数值}${s.影响.length ? '（影响：' + s.影响.join('/') + '）' : '（需你判断适用场景）'}`).join('\n')}`
+    : ''
+
+  const zizhiNote = round.资质来源 && round.资质来源.length > 0
+    ? `\n【资质加成】(灵根/天资，已计入修炼/突破/炼制基础值)：${round.资质来源.join('、')}`
+    : ''
+
+  const gongfaNote = round.功法来源 && round.功法来源.length > 0
+    ? `\n【主修功法】(已计入修炼/突破/战斗基础值，感知减半)：${round.功法来源.join('、')}`
+    : ''
+
+  const opponentNote = round.对手列表 && round.对手列表.length > 0
+    ? `\n【对手强度】(与玩家同公式计算，已含其功法/天赋/灵根，直接用作战斗难度)\n${round.对手列表.join('\n')}`
+    : ''
+
+  // 未建档单位（散修/妖兽/路人）的战斗基准，供 AI 查表，避免自行瞎估
+  const unlistedNote = `\n【未建档单位战斗基准】对手不在上述名单时按境界取:
+${unlistedBaselineTable()}
+（基准为「同境界普通修士」，功法天赋出众者上浮50%内，老弱病残下浮30%内；妖兽按同境界上浮20%计）`
+
   return `# 本回合判定（数值已掷好，禁止重算，禁止改结果）
-境界：${round.境界名}。${daoNote}
+境界：${round.境界名}。${daoNote}${gongfaNote}${abilityNote}${zizhiNote}${opponentNote}${unlistedNote}
 判定值 ≥ 难度值 → 成功；判定值 ≥ 难度+8 → 大成功；判定值 ≥ 难度+15 → 完美。
 判定值 < 难度-12 → 大失败；其他情况 → 失败。
 ${lines.join('\n')}
 ${craftNotes.length ? `\n【无对应大道】\n${craftNotes.join('\n')}` : ''}
 
 【难度选择规则】
-**战斗/逃跑**：难度 = 对手基础值（从对手数据获取）。逃跑难度 = 对手基础值 × 0.7
+⚠️难度下限为1：无论叠加多少减免（天赋、传承、法宝、材料），难度都必须 ≥ 1，禁止出现 0 或负数。
+**战斗/逃跑**：难度 = 对手基础值（见【对手强度】，已含其功法/天赋）。逃跑难度 = 对手基础值 × 0.7
 **炼丹/炼器/制符/布阵**：难度 = 物品品质品级固定值（见业务规则中的炼制难度表），按炼制方式乘系数后再加减其他因素
 **社交**：难度 = 对方基础社交难度（5-90，取决于地位、立场、好感度）
 **修炼**：难度 = 你的修炼基础值 × 0.5

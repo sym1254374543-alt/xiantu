@@ -609,6 +609,8 @@ class AIBidirectionalSystemClass {
         效果: stateForAI.角色?.效果,
         灵气浓度: stateForAI.角色?.位置?.灵气浓度,
         大道: stateForAI.角色?.大道,  // 传入大道数据
+        存档: stateForAI,  // 传入存档，用于读取天赋技能加成/灵根/天资/功法
+        对手列表: Object.values(stateForAI.社交?.关系 || {}),  // NPC，用于对等的战斗难度
       });
       coreStatusSummary += `\n\n${formatJudgementBlock(judgementRound)}`;
       // --- 结束 ---
