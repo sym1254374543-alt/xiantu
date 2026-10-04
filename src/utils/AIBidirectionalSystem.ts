@@ -2594,59 +2594,38 @@ ${saveDataJson}`, role: 'system', depth: 4, position: 'in_chat' },
    * 与正式游戏交互保持一致：移除叙事历史、短期记忆、隐式中期记忆
    */
   private _extractEssentialDataForSummary(saveData: SaveData): SaveData {
-    const simplified = cloneDeep(saveData);
-    const s = simplified as any;
+    // 白名单：只保留「核对名称」所需的最小信息。
+    // 存档里有 世界.地图集（每境界一张完整地图）、系统.图廊（图片）、社交.事件 等巨型字段，
+    // 黑名单删不干净；直接构造小对象，也不 cloneDeep 整个存档（避免克隆 800 万字符）。
+    const s = saveData as any;
+    const simplified: any = {};
 
-    // 删除叙事历史（正确路径是 系统.历史.叙事）
-    if (s.系统?.历史?.叙事) {
-      delete s.系统.历史.叙事;
+    const identity = s.角色?.身份;
+    if (identity && typeof identity === 'object') {
+      const base: any = {};
+      if (identity.名字 != null) base.名字 = identity.名字;
+      if (identity.性别 != null) base.性别 = identity.性别;
+      if (identity.境界 != null) base.境界 = identity.境界;
+      if (identity.种族 != null) base.种族 = identity.种族;
+      if (Object.keys(base).length) simplified.角色 = { 身份: base };
     }
 
-    // 删除所有记忆
-    if (s.社交?.记忆) {
-      delete s.社交.记忆.短期记忆;
-      delete s.社交.记忆.隐式中期记忆;
-      delete s.社交.记忆.中期记忆;
-      delete s.社交.记忆.长期记忆;
+    // NPC 名称列表（仅用于核对名称）
+    const rel = s.社交?.关系;
+    if (rel && typeof rel === 'object' && !Array.isArray(rel)) {
+      const names = Object.keys(rel).filter(Boolean);
+      if (names.length) simplified.NPC名称 = names;
     }
 
-    // 社交关系只保留名字
-    if (s.社交?.关系) {
-      for (const name of Object.keys(s.社交.关系)) {
-        const npc = s.社交.关系[name];
-        if (npc && typeof npc === 'object') {
-          s.社交.关系[name] = { 名字: npc.名字 || name };
-        }
-      }
+    if (s.世界?.信息?.世界名称 != null) {
+      simplified.世界名称 = s.世界.信息.世界名称;
     }
 
-    // 世界信息只保留名称和背景前 200 字
-    if (s.世界?.信息) {
-      s.世界.信息 = {
-        世界名称: s.世界.信息.世界名称,
-        世界背景: s.世界.信息.世界背景?.slice(0, 200)
-      };
+    if (s.社交?.宗门?.当前宗门 != null) {
+      simplified.宗门名称 = s.社交.宗门.当前宗门;
     }
 
-    // 删除角色的大字段
-    if (s.角色) {
-      delete s.角色.背包;
-      delete s.角色.大道;
-      delete s.角色.功法;
-      delete s.角色.技能;
-      delete s.角色.身体;
-      delete s.角色.效果;
-
-      // 天赋只保留名字
-      if (Array.isArray(s.角色.身份?.天赋)) {
-        s.角色.身份.天赋 = s.角色.身份.天赋.map((x: any) => {
-          if (typeof x === 'string') return x;
-          return { name: x?.name ?? x?.名称 };
-        });
-      }
-    }
-
-    return simplified;
+    return simplified as SaveData;
   }
 
   /**
