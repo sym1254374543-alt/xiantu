@@ -104,7 +104,7 @@ export function calculateTalentBonusesFromCharacter(saveData: SaveData): InnateA
   // 遍历角色的每个天赋
   characterTalents.forEach((talent: any, index: number) => {
     let talentData: Talent | undefined;
-    let talentName: string;
+    let talentName: string = ''; // 初始化为空字符串
 
     if (typeof talent === 'string') {
       talentName = talent;
@@ -129,6 +129,9 @@ export function calculateTalentBonusesFromCharacter(saveData: SaveData): InnateA
           effects: talent.effects
         };
       }
+    } else {
+      console.warn(`[天赋加成计算] 天赋${index + 1}: 未知格式`, talent);
+      return; // 跳过无效的天赋
     }
 
     if (talentData && talentData.effects) {
