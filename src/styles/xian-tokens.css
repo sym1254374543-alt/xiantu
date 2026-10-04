@@ -1,0 +1,218 @@
+/**
+ * 仙途全局令牌（--cc-*）：暗色「夜山松烟」/ 亮色「宣纸淡墨」
+ * 供创角页、提示弹窗、全局菜单、API 管理等非局内界面共用。
+ */
+
+:root {
+  --cc-calligraphy: 'Ma Shan Zheng', 'STXingkai', '华文行楷', 'KaiTi', 'STKaiti', '楷体', var(--font-family-serif);
+
+  --cc-shell-bg:
+    radial-gradient(ellipse 70% 35% at 50% 0%, rgba(120, 140, 255, 0.09) 0%, transparent 70%),
+    linear-gradient(170deg, rgba(12, 18, 33, 0.82) 0%, rgba(19, 27, 45, 0.78) 100%);
+  --cc-shell-border: rgba(212, 184, 120, 0.22);
+  --cc-shell-shadow: 0 32px 64px -24px rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.03) inset;
+
+  --cc-solid-bg: #131a2a; /* 不透明底：抽屉、下拉等需要遮住下层内容的地方 */
+  --cc-surface: rgba(255, 255, 255, 0.03);
+  --cc-surface-2: rgba(255, 255, 255, 0.05);
+  --cc-surface-hover: rgba(255, 255, 255, 0.065);
+  --cc-inset: rgba(0, 0, 0, 0.24);
+  --cc-border: rgba(212, 184, 120, 0.14);
+  --cc-border-strong: rgba(212, 184, 120, 0.34);
+  --cc-divider: rgba(255, 255, 255, 0.06);
+
+  --cc-text: #eceff5;
+  --cc-text-2: #a9b2c3;
+  --cc-text-3: #78839a;
+
+  --cc-accent: #9db8ff;
+  --cc-accent-rgb: 157, 184, 255;
+  --cc-gold: #d4b878;
+  --cc-gold-rgb: 212, 184, 120;
+  --cc-seal: #c0392b;
+  --cc-seal-text: #fbe9dc;
+  --cc-danger: #f87171;
+  --cc-danger-rgb: 248, 113, 113;
+  --cc-success: #6ee7b7;
+  --cc-warning: #f2c46b;
+  --cc-warning-rgb: 242, 196, 107;
+
+  --cc-primary-bg: linear-gradient(135deg, #3d6be0 0%, #5a4fd0 100%);
+  --cc-primary-border: rgba(230, 206, 150, 0.55);
+  --cc-primary-shadow: 0 10px 24px -10px rgba(90, 100, 230, 0.8);
+  --cc-selected-bg:
+    radial-gradient(ellipse at 0% 50%, rgba(120, 150, 255, 0.2) 0%, transparent 70%),
+    linear-gradient(90deg, rgba(90, 120, 230, 0.14) 0%, rgba(255, 255, 255, 0.02) 100%);
+  --cc-glow: 0 0 22px -6px rgba(157, 184, 255, 0.45);
+  --cc-watermark: rgba(255, 255, 255, 0.035);
+  --cc-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23a9b2c3' d='M6 8.5 2 4.5h8z'/%3E%3C/svg%3E");
+
+}
+
+
+:root[data-theme='light'] {
+  --cc-shell-bg:
+    radial-gradient(ellipse 70% 35% at 50% 0%, rgba(222, 243, 238, 0.52) 0%, transparent 70%),
+    linear-gradient(170deg, rgba(243, 245, 240, 0.96) 0%, rgba(226, 234, 230, 0.94) 100%);
+  --cc-shell-border: rgba(55, 86, 86, 0.24);
+  --cc-shell-shadow: 0 32px 64px -28px rgba(34, 58, 62, 0.28), 0 0 0 1px rgba(255, 255, 255, 0.72) inset;
+
+  --cc-solid-bg: #eef2ee;
+  --cc-surface: rgba(255, 255, 255, 0.58);
+  --cc-surface-2: rgba(255, 255, 255, 0.74);
+  --cc-surface-hover: rgba(255, 255, 255, 0.92);
+  --cc-inset: rgba(221, 230, 226, 0.72);
+  --cc-border: rgba(55, 86, 86, 0.18);
+  --cc-border-strong: rgba(55, 86, 86, 0.34);
+  --cc-divider: rgba(55, 86, 86, 0.12);
+
+  --cc-text: #233238;
+  --cc-text-2: #44545a;
+  --cc-text-3: #5b6b70;
+
+  --cc-accent: #256a67;
+  --cc-accent-rgb: 37, 106, 103;
+  --cc-gold: #7f5d27;
+  --cc-gold-rgb: 127, 93, 39;
+  --cc-seal: #b8322a;
+  --cc-seal-text: #fff4ea;
+  --cc-danger: #b91c1c;
+  --cc-danger-rgb: 185, 28, 28;
+  --cc-success: #15803d;
+  --cc-warning: #9a5b00;
+  --cc-warning-rgb: 180, 110, 0;
+
+  --cc-primary-bg: linear-gradient(135deg, #2f7774 0%, #255b68 100%);
+  --cc-primary-border: rgba(95, 157, 151, 0.62);
+  --cc-primary-shadow: 0 10px 20px -10px rgba(37, 91, 104, 0.42);
+  --cc-selected-bg:
+    radial-gradient(ellipse at 0% 50%, rgba(47, 119, 116, 0.13) 0%, transparent 70%),
+    linear-gradient(90deg, rgba(226, 241, 237, 0.88) 0%, rgba(239, 245, 241, 0.68) 100%);
+  --cc-glow: 0 4px 14px -6px rgba(37, 91, 104, 0.26);
+  --cc-watermark: rgba(48, 78, 82, 0.055);
+  --cc-caret: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%2352636a' d='M6 8.5 2 4.5h8z'/%3E%3C/svg%3E");
+}
+
+/* 原生下拉列表：选项继承了浅色文字，但系统用自己的浅灰底绘制列表，暗色下看不清。
+   统一给选项不透明的主题底色（全局生效，局内下拉同样受益）。 */
+select option,
+select optgroup {
+  background-color: var(--cc-solid-bg);
+  color: var(--cc-text);
+}
+
+select option:disabled {
+  color: var(--cc-text-3);
+}
+
+/* ------------------------------------------------------------
+   可定制下拉（appearance: base-select，Chrome/Edge 135+）
+   原生下拉的悬停/选中高亮由系统绘制（灰色），无法用普通 CSS 修改；
+   支持的浏览器里改为主题化的下拉面板，其余浏览器回退到上面的原生配色。
+   作用于所有仙途界面容器，局内外下拉保持同一套主题。
+   ------------------------------------------------------------ */
+@supports (appearance: base-select) {
+  :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+      .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select,
+  :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+      .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select::picker(select) {
+    /* 组件 scoped 样式里的 appearance: none 优先级更高，这里必须强制 */
+    appearance: base-select !important;
+  }
+
+  /* 组件自己用 background-image 画了下拉箭头，隐藏内置箭头避免重复 */
+  :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+      .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select::picker-icon {
+    display: none;
+  }
+
+  :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+      .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select::picker(select) {
+    margin-block: 4px;
+    padding: 4px;
+    /* 面板按内容变宽，不跟被挤窄的选择框走，避免长模型名溢出后被裁切 */
+    width: max-content;
+    min-width: max(100%, min(22rem, 92vw));
+    max-width: min(28rem, 92vw);
+    max-height: min(320px, 60vh);
+    overflow: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--cc-border-strong);
+    border-radius: 8px;
+    background: var(--cc-solid-bg);
+    color: var(--cc-text);
+    box-shadow: 0 18px 40px -12px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(var(--cc-gold-rgb), 0.08) inset;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(var(--cc-gold-rgb), 0.35) transparent;
+    opacity: 1;
+    transform: none;
+    transition: opacity 0.14s ease, transform 0.14s ease, overlay 0.14s allow-discrete, display 0.14s allow-discrete;
+  }
+
+  @starting-style {
+    :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+        .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select:open::picker(select) {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+  }
+
+  :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+      .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select optgroup {
+    margin: 0.15rem 0 0.2rem;
+    padding: 0.35rem 0.55rem 0.1rem;
+    color: var(--cc-text-3);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+  }
+
+  :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+      .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select option {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    padding: 0.45rem 0.7rem;
+    border-radius: 5px;
+    background: transparent;
+    color: var(--cc-text);
+    font-size: 0.86rem;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+    line-height: 1.45;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    cursor: pointer;
+    transition: background 0.12s ease, color 0.12s ease;
+  }
+
+  :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+      .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select option:is(:hover, :focus-visible) {
+    outline: none;
+    background: var(--cc-surface-hover);
+    color: var(--cc-accent);
+  }
+
+  :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+      .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select option:checked {
+    background: rgba(var(--cc-gold-rgb), 0.16);
+    color: var(--cc-gold);
+    font-weight: 600;
+  }
+
+  :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+      .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select option::checkmark {
+    order: 1;
+    margin-left: auto;
+    color: var(--cc-gold);
+  }
+
+  :is(.creation-container, .xian-scope, .mode-selection-container, .settings-panel, .api-management-panel,
+      .prompt-panel, .character-management-panel, .cc-modal, .gm-view) select option:disabled {
+    color: var(--cc-text-3);
+    cursor: not-allowed;
+  }
+}

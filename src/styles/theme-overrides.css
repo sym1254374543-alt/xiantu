@@ -1,0 +1,14 @@
+﻿/* 只保留无法放进组件的少量全局约束，不再用 !important 覆盖面板样式。 */
+
+.right-sidebar .sidebar-content {
+  scrollbar-color: var(--scrollbar-thumb-color) transparent;
+}
+
+.right-sidebar .sidebar-content::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb-color);
+}
+
+button {
+  min-width: 0;
+  max-width: 100%;
+}

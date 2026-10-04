@@ -1,0 +1,861 @@
+/**
+ * 仙途 (XianTu) - 主样式表
+ * @author 千夜 (qianye60)
+ * @license CC BY-NC-SA 4.0
+ * GitHub: github.com/qianye60 | Bilibili: space.bilibili.com/477576651
+ */
+
+/* --- Design Tokens (The Alchemist's Formula) --- */
+:root {
+  /* --- Light Theme Colors (明亮版) --- */
+  --color-background: #ebe8e1; /* 更柔和的米白色 */
+  --color-background-transparent: rgba(235, 232, 225, 0.92);
+  --color-surface: #f8f6f3; /* 柔和的浅米色，不再是纯白 */
+  --color-surface-transparent: rgba(248, 246, 243, 0.88);
+  --color-surface-light: #e6e3dc; /* 更柔和的浅灰 */
+  /* Derived/interactive states (light) */
+  --color-surface-hover: #f2efe9; /* 悬浮时的柔和色 */
+  --color-primary: #1e4a9a; /* 更深的主色调 */
+  --color-primary-rgb: 30, 74, 154;
+  --color-primary-hover: #163d82;
+  --color-primary-active: #0f2f6a;
+  /* Lighten variant used by some components */
+  --color-primary-light: rgba(30, 74, 154, 0.15);
+  --color-accent: #2e8b57; /* 翠玉绿 - 修仙风格 */
+  --color-accent-hover: #267349;
+  --color-accent-light: rgba(46, 139, 87, 0.18);
+  --color-text: #1a1a1a;
+  --color-text-secondary: #4a4a4a; /* 更深，提高对比度 */
+  --color-text-muted: #5a5a5a; /* 更深，提高对比度 */
+  --color-white-soft: #f1eee7; /* 柔和的白色 */
+  --color-border: rgba(0, 0, 0, 0.12); /* 更柔和的边框 */
+  --color-border-hover: rgba(0, 0, 0, 0.25);
+  --color-success: #2e8b32; /* 更深的绿色，提高可读性 */
+  --color-success-hover: #267529;
+  --color-warning: #e68a00; /* 更深的橙色 */
+  --color-warning-hover: #cc7a00;
+  --color-error: #dc2626; /* 更深的红色 */
+  --color-error-hover: #c22050;
+  --color-info: #2196f3;
+  --color-info-hover: #1e88e5;
+  /* Keep danger alias for components that expect it */
+  --color-danger: var(--color-error);
+  --color-danger-hover: #e53935;
+  /* Generic hover background alias used in components */
+  --color-hover: var(--color-surface-hover);
+  /* Code block background used in data views */
+  --color-code-bg: #0f172a0f; /* subtle deep slate with opacity */
+  /* Global scrollbar tokens (light) – hide track, show only thumb */
+  --scrollbar-track-color: transparent;
+  --scrollbar-thumb-color: rgba(0, 0, 0, 0.28);
+  --scrollbar-thumb-hover-color: rgba(0, 0, 0, 0.4);
+
+  /* Vital colors (light theme) */
+  --vital-health: #ff2929;   /* 气血/健康（与 --color-error 保持一致） */
+  --vital-lingqi: #3b82f6;   /* 灵气(统一蓝) */
+  --vital-spirit: #ffeb00;   /* 神识(金色) */
+  --vital-lifespan: #c253ff; /* 寿元(紫色) */
+
+  /* Derived RGB triplets for rgba() usage (light) */
+  --color-background-rgb: 235, 232, 225;
+  --color-surface-rgb: 248, 246, 243;
+  --color-accent-rgb: 46, 139, 87;
+  --color-border-rgb: 0, 0, 0;
+  --color-success-rgb: 46, 139, 50;
+  --color-warning-rgb: 230, 138, 0;
+  --color-error-rgb: 220, 38, 38;
+  --color-info-rgb: 33, 150, 243;
+
+  /* UI缩放变量。视口单位要除掉缩放，否则 100vh 会比缩放后的窗口更高，页面被顶偏 */
+  --ui-scale: 1;
+  --app-vh: calc(100vh / var(--ui-scale));
+  --app-dvh: calc(100dvh / var(--ui-scale));
+  --app-svh: calc(100svh / var(--ui-scale));
+  --base-font-size: 1rem;
+  --lang-font-scale: 1;
+
+  /* 字体与过渡 */
+  --font-family-serif: 'SimSun', 'NSimSun', 'STSong', '宋体', 'Noto Serif SC', 'KaiTi', 'STKaiti', serif;
+  --font-family-sans-serif: 'SimSun', 'NSimSun', 'STSong', '宋体', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --transition-fast: all 0.2s ease-in-out;
+}
+
+/* --- 暗色主题灵脉: "松烟玄墨" (通过 data-theme 属性激活) --- */
+:root[data-theme='dark'] {
+  /* --- Dark Theme Colors --- */
+  --color-background: rgb(30, 41, 59);
+  --color-background-transparent: rgba(26, 27, 38, 0.85);
+  --color-surface: #232e40;
+  --color-surface-transparent: rgba(41, 51, 72, 0.6);
+  --color-surface-light: #414868;
+  /* Derived/interactive states (dark) */
+  --color-surface-hover: #33415f;
+  --color-primary: #82a3f5;
+  --color-primary-rgb: 130, 163, 245;
+  --color-primary-hover: #6f93f2;
+  --color-primary-active: #597ee6;
+  --color-primary-light: rgba(130, 163, 245, 0.18);
+  --color-accent: #7dd3a0; /* 翠玉绿 - 暗色主题 */
+  --color-accent-hover: #6bc48e;
+  --color-accent-light: rgba(125, 211, 160, 0.15);
+  --color-text: #f7f7f5; /* 柔和的暖白色，不那么刺眼 */
+  --color-text-secondary: #d0d0d0;
+  --color-text-muted: #b9b9b9; /* 增强对比度 */
+  --color-white-soft: #f7f7f5; /* 暗色主题下的柔和白色 */
+  --color-border: rgba(173, 216, 230, 0.5);
+  --color-border-hover: rgba(173, 216, 230, 0.8);
+  --color-success: #9ece6a;
+  --color-success-hover: #88b85b;
+  --color-warning: #ffd500;
+  --color-warning-hover: #e6c200;
+  --color-error: #ff2f49; /* 暗色下更红一些 */
+  --color-error-hover: #e64470;
+  --color-info: #77cdfe;
+  --color-info-hover: #66bff4;
+  --color-danger: var(--color-error);
+  --color-danger-hover: #e66a81;
+  --color-hover: var(--color-surface-hover);
+  --color-code-bg: rgba(20, 26, 43, 0.6);
+  /* Global scrollbar tokens (dark) – hide track, show only thumb */
+  --scrollbar-track-color: transparent;
+  --scrollbar-thumb-color: rgba(255, 255, 255, 0.35);
+  --scrollbar-thumb-hover-color: rgba(255, 255, 255, 0.5);
+
+  /* Vital colors (dark theme) */
+  --vital-health: #ff2f49;   /* 气血/健康（暗色，与 --color-error 保持一致） */
+  --vital-lingqi: #3b82f6;   /* 灵气(统一蓝) */
+  --vital-spirit: #ffeb00;   /* 神识(金色) */
+  --vital-lifespan: #c253ff; /* 寿元(紫色) */
+
+  /* Derived RGB triplets for rgba() usage (dark) */
+  --color-background-rgb: 26, 27, 38;
+  --color-surface-rgb: 41, 51, 72;
+  --color-accent-rgb: 125, 211, 160;
+  --color-border-rgb: 173, 216, 230;
+  --color-success-rgb: 158, 206, 106;
+  --color-warning-rgb: 255, 213, 0;
+  --color-error-rgb: 255, 47, 73;
+  --color-info-rgb: 119, 205, 254;
+}
+
+html[data-lang='en'] {
+  --lang-font-scale: 0.94;
+}
+
+/* --- Base Styles --- */
+html,
+body {
+  /* 高度将由 App.vue 中的脚本动态设置，此处不应有 height 或 min-height */
+  margin: 0;
+  padding: 0;
+  /* 窗口本身不滚动，滚动留在 #app 和各页面内部，避免缩放时整页被顶走 */
+  font-family: var(--font-family-serif);
+  /* 透明背景以显示视频背景（VideoBackground组件使用z-index:-10） */
+  background-color: transparent;
+  color: var(--color-text);
+  /* 遵道友法旨，去除所有文字阴影，返璞归真。 */
+  text-shadow: none;
+  /* 确保在iframe中也能正确填充 */
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  position: absolute; /* 使用绝对定位强制撑满body */
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: auto; /* 内容超出时在画布内滚动，窗口本身不跟着挪 */
+  /* zoom 会改百分比的包含块。这里保持 100%，视觉上仍铺满窗口；再除一次缩放会把页面缩得过小并挤出滚动条 */
+  zoom: var(--ui-scale);
+  /* 应用基础字体大小 */
+  font-size: calc(var(--base-font-size) * var(--lang-font-scale));
+  /* 透明背景以显示视频背景 */
+  background-color: transparent;
+}
+
+#app-container {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  /* 透明背景以显示视频背景 */
+  background-color: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* English UI overflow guards */
+html[data-lang='en'] .panel-tab,
+html[data-lang='en'] .filter-tab,
+html[data-lang='en'] .tabs-nav button,
+html[data-lang='en'] .tab-item,
+html[data-lang='en'] .menu-item,
+html[data-lang='en'] .nav-item,
+html[data-lang='en'] .action-btn,
+html[data-lang='en'] .tech-btn,
+html[data-lang='en'] .function-btn,
+html[data-lang='en'] .btn {
+  min-width: 0;
+}
+
+html[data-lang='en'] .panel-tab span,
+html[data-lang='en'] .filter-tab span,
+html[data-lang='en'] .tabs-nav button span,
+html[data-lang='en'] .tab-item span,
+html[data-lang='en'] .menu-item span,
+html[data-lang='en'] .nav-item span,
+html[data-lang='en'] .action-btn span,
+html[data-lang='en'] .tech-btn,
+html[data-lang='en'] .function-btn span,
+html[data-lang='en'] .btn,
+html[data-lang='en'] .btn-text,
+html[data-lang='en'] .btn-desc,
+html[data-lang='en'] .sidebar-title,
+html[data-lang='en'] .section-title,
+html[data-lang='en'] .panel-title,
+html[data-lang='en'] .section-header span,
+html[data-lang='en'] .stat-label,
+html[data-lang='en'] .stat-value,
+html[data-lang='en'] .meta-label,
+html[data-lang='en'] .meta-tag,
+html[data-lang='en'] .meta-stat,
+html[data-lang='en'] .tab-count,
+html[data-lang='en'] .badge,
+html[data-lang='en'] .tag,
+html[data-lang='en'] .title-text,
+html[data-lang='en'] .list-item-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+html[data-lang='en'] .btn-content {
+  min-width: 0;
+}
+
+html[data-lang='en'] p,
+html[data-lang='en'] .desc,
+html[data-lang='en'] .description,
+html[data-lang='en'] .subtitle,
+html[data-lang='en'] .panel-subtitle,
+html[data-lang='en'] .empty-description,
+html[data-lang='en'] .technique-desc,
+html[data-lang='en'] .skill-desc,
+html[data-lang='en'] .mastered-desc {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* --- Reusable Button Class (The Master's Touch) --- */
+.btn {
+  display: inline-block;
+  padding: 0.75rem 1.5rem;
+  border: 1px solid var(--color-primary);
+  border-radius: 8px;
+  background-color: transparent;
+  color: var(--color-primary);
+  font-family: var(--font-family-serif);
+  font-size: 1rem;
+  font-weight: bold;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  user-select: none; /* Prevent text selection on click */
+  position: relative;
+  overflow: hidden;
+}
+
+/* --- Button States (Guaranteed Visual Feedback) --- */
+.btn:hover {
+  background-color: var(--color-primary);
+  color: #fff;
+  box-shadow: 0 0 15px rgba(200, 160, 100, 0.5);
+}
+
+.btn:active {
+  transform: scale(0.98);
+  background-color: var(--color-primary-active);
+  border-color: var(--color-primary-active);
+  box-shadow: none;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--color-primary-hover);
+  outline-offset: 2px;
+}
+
+/* --- Disabled Button State --- */
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background-color: transparent;
+  color: var(--color-border);
+  border-color: var(--color-border);
+  box-shadow: none;
+}
+
+/* --- 移除流光特效 --- */
+
+/* --- Button Variants --- */
+.btn.btn-secondary {
+  border-color: var(--color-border);
+  color: var(--color-text);
+}
+
+.btn.btn-secondary:hover {
+  background-color: var(--color-surface);
+  border-color: var(--color-text);
+}
+
+.btn.btn-complete {
+  border-color: var(--color-accent); /* 青玉色 */
+  color: var(--color-accent);
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.btn.btn-complete:hover {
+  background-color: var(--color-accent);
+  color: #fff;
+  box-shadow: 0 0 20px rgba(111, 179, 184, 0.5);
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(111, 179, 184, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(111, 179, 184, 0.6);
+  }
+}
+
+/* --- 全局滚动条美化 (兼容 WebKit & Firefox) --- */
+/* WebKit browsers (Chrome, Safari, Edge) */
+#app::-webkit-scrollbar {
+  width: 10px; /* 稍微加宽以获得更好的点击区域 */
+  height: 10px;
+}
+
+#app::-webkit-scrollbar-track {
+  background: var(--scrollbar-track-color);
+}
+
+#app::-webkit-scrollbar-thumb {
+  background-color: var(--scrollbar-thumb-color);
+  border-radius: 5px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+  transition: background-color 0.3s ease-in-out;
+}
+
+#app::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover-color);
+}
+
+/* Firefox */
+#app {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb-color) var(--scrollbar-track-color);
+}
+
+/* --- 通用法器样式：卡片/面板 (浮空术) --- */
+.card-panel {
+  background: var(--color-surface);
+  border: 2px solid var(--color-primary); /* 坚固、醒目的主色边框 */
+  border-radius: 12px;
+  box-shadow: none; /* 移除所有阴影 */
+  transition: border-color 0.3s ease;
+}
+
+.card-panel:hover {
+  border-color: var(--color-primary-hover); /* 悬浮时边框颜色变亮 */
+  transform: none; /* 移除悬浮时的位移 */
+}
+
+/* --- 新增样式：天机推演动画 (for Login Button) --- */
+.btn.is-loading .btn-text {
+  opacity: 0; /* Hide original text */
+}
+
+.btn.is-loading::before,
+.btn.is-loading::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+  margin-left: -10px;
+  border-radius: 50%;
+  border: 2px solid var(--color-primary);
+  animation-duration: 1.5s;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+.btn.is-loading::before {
+  border-style: solid solid dashed dashed;
+  animation-name: spin-left;
+}
+
+.btn.is-loading::after {
+  border-style: dashed dashed solid solid;
+  animation-name: spin-right;
+}
+
+@keyframes spin-left {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes spin-right {
+  from { transform: rotate(360deg); }
+  to { transform: rotate(0deg); }
+}
+
+/* --- 新增样式：开天辟地 (for MainGame Empty State) --- */
+.genesis-prompt {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  padding: 2rem;
+  text-align: center;
+  background: radial-gradient(ellipse at center, var(--color-surface-light) 0%, var(--color-background) 70%);
+}
+
+.genesis-title {
+  font-family: var(--font-family-serif);
+  font-size: 2.5rem;
+  color: var(--color-primary);
+  margin-bottom: 1rem;
+  text-shadow: 0 0 10px rgba(var(--color-primary-rgb), 0.3);
+}
+
+.genesis-subtitle {
+  font-size: 1.2rem;
+  color: var(--color-text-secondary);
+  max-width: 500px;
+  margin-bottom: 3rem;
+}
+
+.genesis-cta {
+  padding: 1.2rem 2.5rem;
+  font-size: 1.5rem;
+  border-width: 2px;
+  animation: pulse-glow 2.5s ease-in-out infinite;
+}
+
+/* --- 新增样式：道途选择界面 --- */
+.mode-selection-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  max-height: 800px; /* 限制最大高度适应iframe */
+  overflow-y: auto;
+  color: var(--color-text);
+  display: flex;
+  flex-direction: column;
+  align-items: center; /* 水平居中 */
+  justify-content: center; /* 垂直居中 */
+  padding: 1rem 0; /* 减小内部垂直边距 */
+  box-sizing: border-box; /* 确保 padding 不会导致溢出 */
+  background: transparent; /* 透明背景以显示视频 */
+}
+
+.video-background {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: translate(-50%, -50%);
+  z-index: -2;
+}
+
+.video-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5); /* 默认遮罩，暗色主题下可调整 */
+  z-index: -1;
+}
+
+/* 暗色：只压暗四周做暗角，中间山景保持通透 */
+:root[data-theme='dark'] .video-overlay {
+    background:
+      radial-gradient(ellipse 75% 65% at 50% 45%, transparent 35%, rgba(6, 10, 18, 0.38) 100%),
+      rgba(6, 10, 18, 0.06);
+}
+
+.selection-content {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem;
+  background: var(--color-surface-light);
+  border-radius: 16px;
+  border: 1px solid var(--color-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  width: 90%;
+  max-width: 1000px;
+  max-height: calc(100% - 2rem); /* 确保不超出容器 */
+  overflow-y: auto; /* 允许内容滚动 */
+  /* 移除 margin，由父容器的 padding 控制间距 */
+}
+
+.main-title {
+  font-family: var(--font-family-serif);
+  font-size: 3rem;
+  font-weight: 500;
+  margin-bottom: 2.5rem;
+  letter-spacing: 0.2em;
+  text-shadow: 0 0 15px rgba(var(--color-primary-rgb), 0.4);
+}
+
+.paths-container {
+  display: flex;
+  justify-content: center;
+  gap: 3rem;
+  width: 100%;
+}
+
+.path-card {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  border-radius: 1rem;
+  border: 2px solid var(--color-primary);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: all 0.3s ease-in-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.path-card:hover {
+  transform: translateY(-10px);
+  background: rgba(var(--color-primary-rgb), 0.4);
+}
+
+.path-card .path-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    color: var(--color-primary);
+    transition: var(--transition-fast);
+}
+
+.path-card:hover .path-icon {
+    color: var(--color-accent);
+    transform: scale(1.1);
+}
+
+.path-title {
+  font-family: var(--font-family-serif);
+  font-size: 1.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.path-description {
+  font-size: 1rem;
+  color: var(--color-text-secondary);
+  text-align: center;
+  max-width: 300px;
+}
+
+.bottom-actions {
+  position: fixed;
+  z-index: 100; /* Ensure it's on top of everything */
+  bottom: 2rem;
+  right: 2rem;
+  display: flex;
+  gap: 1rem;
+}
+
+.bottom-actions .action-btn {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.5rem;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  backdrop-filter: blur(5px);
+}
+
+.bottom-actions .action-btn:hover {
+  background-color: var(--color-surface-light);
+  color: var(--color-text);
+  border-color: var(--color-border-hover);
+  transform: scale(1.1);
+}
+
+/* --- 通用法器样式：模态对话框/弹窗 (须弥芥子) --- */
+.modal-dialog {
+  background-color: var(--color-surface);
+  color: var(--color-text); /* 显式设置文字颜色，防止继承问题 */
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+}
+
+:root[data-theme='dark'] .modal-dialog {
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* --- 全局操作按钮样式 (新版) --- */
+.global-actions {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.theme-toggle,
+.fullscreen-toggle {
+  --color: #555560;
+  --size: 24px;
+  width: 48px;
+  height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(230, 226, 217, 0.92); /* 使用更柔和的背景色 */
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  color: var(--color);
+  font-size: var(--size);
+  user-select: none;
+  fill: var(--color);
+}
+
+.theme-toggle:hover,
+.fullscreen-toggle:hover {
+  transform: translateY(-2px) scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  background: rgba(220, 216, 207, 0.95); /* 悬浮时稍深 */
+}
+
+.theme-toggle:active,
+.fullscreen-toggle:active {
+  transform: translateY(0);
+}
+
+/* 主题切换图标 */
+.theme-toggle .moon {
+  position: absolute;
+  animation: keyframes-fill .5s;
+  width: 24px;
+  height: 24px;
+}
+
+.theme-toggle .sun {
+  position: absolute;
+  display: none;
+  animation: keyframes-fill .5s;
+  width: 24px;
+  height: 24px;
+}
+
+.theme-toggle input:checked ~ .moon {
+  display: none;
+}
+
+.theme-toggle input:checked ~ .sun {
+  display: block;
+}
+
+/* 全屏切换图标 */
+.fullscreen-toggle .expand {
+  position: absolute;
+  animation: fullscreen-fill .5s;
+  width: 24px;
+  height: 24px;
+}
+
+.fullscreen-toggle .compress {
+  position: absolute;
+  display: none;
+  animation: fullscreen-fill .5s;
+  width: 24px;
+  height: 24px;
+}
+
+.fullscreen-toggle input:checked ~ .expand {
+  display: none;
+}
+
+.fullscreen-toggle input:checked ~ .compress {
+  display: block;
+}
+
+/* 隐藏checkbox */
+.theme-toggle input,
+.fullscreen-toggle input {
+  position: absolute;
+  opacity: 0;
+  cursor: pointer;
+  height: 0;
+  width: 0;
+}
+
+/* 动画效果 */
+@keyframes keyframes-fill {
+  0% {
+    transform: rotate(-360deg) scale(0);
+    opacity: 0;
+  }
+  75% {
+    transform: rotate(25deg);
+  }
+  100% {
+    transform: rotate(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes fullscreen-fill {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.2);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 暗色主题适配 */
+[data-theme="dark"] .theme-toggle,
+[data-theme="dark"] .fullscreen-toggle {
+  background: rgba(41, 51, 72, 0.9);
+  --color: #82A3F5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+[data-theme="dark"] .theme-toggle:hover,
+[data-theme="dark"] .fullscreen-toggle:hover {
+  background: rgba(41, 51, 72, 0.95);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+/* --- App Root & Transitions --- */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* #app-container 样式已在上方定义，此处合并 */
+
+/* --- Author Modal Styles --- */
+.author-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+}
+
+.author-modal {
+  background: var(--color-surface);
+  padding: 1.5rem 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  width: 90%;
+  max-width: 500px;
+  color: var(--color-text);
+}
+
+.author-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 1rem;
+  margin-bottom: 1rem;
+}
+
+.author-modal-header h3 {
+  margin: 0;
+  font-size: 1.4rem;
+  font-family: var(--font-family-serif);
+}
+
+.author-modal-body p {
+  margin: 0.8rem 0;
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.author-modal-body a {
+  color: var(--color-primary);
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.author-modal-body a:hover {
+  text-decoration: underline;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.close-btn:hover {
+  color: var(--color-text);
+}
