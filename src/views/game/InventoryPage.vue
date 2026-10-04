@@ -61,7 +61,7 @@
             <div class="d-badges">
               <SealBadge v-if="isEquipped(selected)" tone="seal">已装备</SealBadge>
               <SealBadge v-if="isCultivating(selected)" tone="seal">修炼中</SealBadge>
-              <SealBadge v-if="selected.类型 === '功法' && selected.修炼进度 !== undefined" tone="gold">修炼进度 {{ selected.修炼进度 }}%</SealBadge>
+              <SealBadge v-if="selected.类型 === '功法'" tone="gold">修炼进度 {{ selectedTechniqueProgress }}%</SealBadge>
             </div>
 
             <p class="gm-prose d-desc">{{ selected.描述 || '暂无描述' }}</p>
@@ -214,7 +214,7 @@ import { useGameStateStore } from '@/stores/gameStateStore';
 import { useCharacterStore } from '@/stores/characterStore';
 import { EnhancedActionQueueManager } from '@/utils/enhancedActionQueue';
 import { qualityTone, qualityKey } from '@/utils/qualityTone';
-import { flattenEffect, qualityLabel, toNumber } from '@/utils/gameDisplay';
+import { flattenEffect, qualityLabel, techniqueProgress, toNumber } from '@/utils/gameDisplay';
 import { isTavernEnv } from '@/utils/tavern';
 import { useWallet } from '@/composables/useWallet';
 import { usePageActions } from '@/composables/usePageActions';
@@ -285,6 +285,7 @@ const clearFilters = () => {
 const selectedId = ref('');
 const detailOpen = ref(false);
 const selected = computed(() => allItems.value.find((i) => i.物品ID === selectedId.value) || null);
+const selectedTechniqueProgress = computed(() => techniqueProgress(selected.value, gs.techniqueSystem));
 const select = (id: string) => {
   selectedId.value = id;
   detailOpen.value = true;

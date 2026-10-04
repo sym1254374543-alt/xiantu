@@ -3,11 +3,11 @@
  *
  * 有效属性 = 先天 × 0.7 + 后天 × 0.3
  * 属性加权 = 主 × 0.5 + 副 × 0.3 + 辅 × 0.2
- * 基础值 = 底子 10 + 属性加权 + 境界加成
+ * 基础值 = 底子 10 + 属性加权 + 境界加成（炼丹/炼器/制符/布阵另计，见 getDaoStageBase）
  * 判定值 = 基础值 + 幸运点 + 环境修正 + 状态修正
- * 难度 = f(事情本身)，不随角色能力变化
+ * 难度 = f(事情本身)，不随角色能力变化；各类型难度由 AI 按业务规则表取值
  *
- * 大道修为：前端提供大道信息，AI根据行动类型和大道匹配度调整难度（不调整基础值）
+ * 炼制门类（炼丹/炼器/制符/布阵）各自匹配对应大道，基础值由大道阶段决定。
  */
 
 import { realmRank } from '@/utils/realmOrder'
@@ -30,7 +30,10 @@ const TYPE_WEIGHTS: Record<string, [SixSiKey, SixSiKey, SixSiKey]> = {
   战斗防: ['根骨', '心性', '灵性'],
   修炼: ['悟性', '灵性', '心性'],
   突破: ['悟性', '灵性', '心性'],
-  炼制: ['悟性', '灵性', '心性'],
+  炼丹: ['悟性', '灵性', '心性'],
+  炼器: ['悟性', '灵性', '心性'],
+  制符: ['悟性', '灵性', '心性'],
+  布阵: ['悟性', '灵性', '心性'],
   探索: ['气运', '灵性', '悟性'],
   社交: ['魅力', '悟性', '心性'],
   逃跑: ['灵性', '气运', '根骨'],
@@ -62,13 +65,15 @@ function getDaoStageBase(stage: number): number {
 export interface JudgementBaseLine {
   属性加权: number
   基础: number
-  大道阶段?: number  // 炼制类型特有：使用的大道阶段
+  大道阶段?: number  // 炼制门类特有：使用的大道阶段
+  炼制提示?: string  // 炼制门类特有：无对应大道时的失败提示
 }
 
 export interface DaoStageInfo {
   大道名: string
   当前阶段: number
   阶段名称: string
+  是否解锁?: boolean
 }
 
 export interface JudgementRound {
@@ -406,24 +411,7 @@ export function statusModifier(attributes: unknown, effects: unknown): number {
   return Math.min(15, Math.max(-10, mod))
 }
 
-/**
- * 难度跟着该类型基础值走，不再使用固定的 10/20/35/50。
- * 幸运大约在 -8～+16，档位必须落在这个跨度里。气运 4、无伤时成功率约：
- * 简单 100%｜普通 65%｜困难 47%｜艰难 29%｜极难 12%。
- */
-export function difficultyBands(base: number): Record<'极易' | '简单' | '普通' | '困难' | '艰难' | '极难', number> {
-  const atLeastOne = (n: number) => Math.max(1, n)
-  return {
-    极易: atLeastOne(base - 12),
-    简单: atLeastOne(base - 6),
-    普通: atLeastOne(base),
-    困难: base + 3,
-    艰难: base + 6,
-    极难: base + 9,
-  }
-}
-
-/** 档位间距跟幸运跨度对齐：原先完美要 +30，幸运最多 +15，永远出不来。 */
+/** 结果分档：与难度+数值的差决定成败档位。 */
 export function computeJudgementResult(finalValue: number, difficulty: number): string {
   if (finalValue >= difficulty + 15) return '完美'
   if (finalValue >= difficulty + 8) return '大成功'
@@ -439,48 +427,43 @@ function realmNameOf(attributes: unknown): string {
   return ''
 }
 
+/** 炼制门类 → 对应大道的名称关键字 */
+const CRAFT_DAO_KEYWORDS: Record<string, string[]> = {
+  炼丹: ['丹', '药', '医'],
+  炼器: ['器', '铸', '锻'],
+  制符: ['符'],
+  布阵: ['阵'],
+}
+
+/** 炼制门类 → 无匹配大道时的失败提示 */
+const CRAFT_DAO_HINT: Record<string, string> = {
+  炼丹: '你没有丹道修为，强行炼丹几乎必败，可借此入丹道之门',
+  炼器: '你没有器道修为，强行炼器几乎必败，可借此入器道之门',
+  制符: '你没有符道修为，强行制符几乎必败，可借此入符道之门',
+  布阵: '你没有阵道修为，强行布阵几乎必败，可借此入阵道之门',
+}
+
 /**
- * 查找与炼制类型匹配的大道，返回该大道的当前阶段
- * 炼制类型包括：炼丹、炼器、制符、布阵等
- * 匹配规则：大道名称中包含关键字（丹/药/医 对应炼丹，器/铸/锻 对应炼器，符 对应制符，阵 对应布阵）
+ * 查找与炼制门类匹配的大道，返回该大道的当前阶段；无匹配返回 -1。
+ * 只认本门类的关键字，避免炼丹误用器道、更不会误用剑道。
  */
 function findMatchingDaoStage(daoList: DaoStageInfo[], craftType: string): number {
-  console.log(`[大道匹配] 开始匹配，炼制类型="${craftType}"，大道列表:`, daoList)
-
-  if (!daoList || daoList.length === 0) {
-    console.log('[大道匹配] 没有大道数据，返回-1')
+  const keywords = CRAFT_DAO_KEYWORDS[craftType]
+  if (!keywords) {
+    console.warn(`[大道匹配] 未知炼制门类 "${craftType}"，无法匹配大道`)
     return -1
   }
+  if (!daoList || daoList.length === 0) return -1
 
-  // 定义炼制类型关键字映射（默认匹配"炼制"）
-  const keywords: string[] = []
-  if (craftType.includes('炼丹') || craftType.includes('丹')) {
-    keywords.push('丹', '药', '医')
-  } else if (craftType.includes('炼器') || craftType.includes('器')) {
-    keywords.push('器', '铸', '锻')
-  } else if (craftType.includes('制符') || craftType.includes('符')) {
-    keywords.push('符')
-  } else if (craftType.includes('布阵') || craftType.includes('阵')) {
-    keywords.push('阵')
-  } else {
-    // 默认：查找任意炼制相关的大道（更宽松的匹配）
-    keywords.push('丹', '药', '器', '符', '阵', '炼', '铸', '锻', '医', '道')
-  }
-
-  console.log(`[大道匹配] 匹配关键字:`, keywords)
-
-  // 查找匹配的大道
+  // 取阶段最高的匹配大道（同一门类可能有多条相关大道）
+  let best = -1
   for (const dao of daoList) {
-    for (const keyword of keywords) {
-      if (dao.大道名.includes(keyword)) {
-        console.log(`[大道匹配] ✅ 匹配成功！大道="${dao.大道名}"，关键字="${keyword}"，阶段=${dao.当前阶段}`)
-        return dao.当前阶段
-      }
+    if (dao.是否解锁 === false) continue
+    if (keywords.some((k) => dao.大道名.includes(k)) && dao.当前阶段 > best) {
+      best = dao.当前阶段
     }
   }
-
-  console.log('[大道匹配] ❌ 没有匹配的大道，返回-1')
-  return -1
+  return best
 }
 
 export function buildJudgementRound(input: {
@@ -528,53 +511,51 @@ export function buildJudgementRound(input: {
     if (!dao || typeof dao !== 'object') continue
     const daoName = String((dao as { 道名?: unknown }).道名 || '')
     const stage = Number((dao as { 当前阶段?: unknown }).当前阶段 ?? 0)
+    const unlocked = (dao as { 是否解锁?: unknown }).是否解锁
     const stageList = (dao as { 阶段列表?: unknown[] }).阶段列表
     const stageName = Array.isArray(stageList) && stageList[stage]
       ? String((stageList[stage] as { 名称?: unknown }).名称 || '')
       : ''
     if (daoName) {
-      daoInfoList.push({ 大道名: daoName, 当前阶段: stage, 阶段名称: stageName })
+      daoInfoList.push({
+        大道名: daoName,
+        当前阶段: stage,
+        阶段名称: stageName,
+        是否解锁: unlocked === undefined ? true : Boolean(unlocked),
+      })
     }
   }
-
-  console.log('[判定系统] 最终daoInfoList:', daoInfoList)
 
   const 分项: Record<string, JudgementBaseLine> = {}
   for (const [type, weights] of Object.entries(TYPE_WEIGHTS)) {
     if (type === '战斗') continue
     const weighted = Math.round(weightedAttribute(attrs, weights))
 
-    let actualBase: number
-    let daoStage: number | undefined
-
-    // 炼制类型：基础值 = 大道阶段基础值 + 境界加成 × 0.3
-    if (type === '炼制') {
-      const matchedStage = findMatchingDaoStage(daoInfoList, '炼制')
-
+    // 炼制门类：基础值 = 对应大道阶段基础值 + 境界加成 × 0.3
+    if (type in CRAFT_DAO_KEYWORDS) {
+      const matchedStage = findMatchingDaoStage(daoInfoList, type)
       if (matchedStage >= 0) {
-        // 有匹配的大道：使用大道阶段基础值 + 境界辅助（30%）
         const daoBase = getDaoStageBase(matchedStage)
-        actualBase = Math.round(daoBase + realmBonus * 0.3)
-        daoStage = matchedStage
-        console.log(`[炼制基础值] 大道阶段${matchedStage}，基础值=${daoBase}，境界辅助=${Math.round(realmBonus * 0.3)}，最终=${actualBase}`)
+        分项[type] = {
+          属性加权: weighted,
+          基础: Math.round(daoBase + realmBonus * 0.3),
+          大道阶段: matchedStage,
+        }
       } else {
-        // 没有匹配的大道：使用极低基础值（几乎不可能成功）
-        actualBase = 5  // 只有底子，没有任何加成
-        console.log(`[炼制基础值] 没有匹配的大道，基础值=${actualBase}（几乎无法成功）`)
+        // 无对应大道：只有底子，几乎必败；提示词会引导 AI 在失败后解锁该大道
+        分项[type] = {
+          属性加权: weighted,
+          基础: 5,
+          炼制提示: CRAFT_DAO_HINT[type],
+        }
       }
-    } else {
-      // 其他类型：基础值 = 底子 + 属性加权 + 境界加成
-      const rawBase = BASE_FLOOR + weighted + realmBonus
-
-      // 应用境界压制（修炼和突破类不压制）
-      actualBase = realmSuppressionBase(rawBase, realmName, input.目标境界, type)
+      continue
     }
 
-    分项[type] = {
-      属性加权: weighted,
-      基础: actualBase,
-      大道阶段: daoStage
-    }
+    // 其他类型：基础值 = 底子 + 属性加权 + 境界加成
+    const rawBase = BASE_FLOOR + weighted + realmBonus
+    const actualBase = realmSuppressionBase(rawBase, realmName, input.目标境界, type)
+    分项[type] = { 属性加权: weighted, 基础: actualBase }
   }
 
   return {
@@ -601,11 +582,11 @@ function signed(n: number): string {
   return n >= 0 ? `+${n}` : String(n)
 }
 
-const PROMPT_TYPES = ['战斗攻', '战斗防', '修炼', '突破', '炼制', '探索', '社交', '逃跑', '感知'] as const
+const PROMPT_TYPES = ['战斗攻', '战斗防', '修炼', '突破', '炼丹', '炼器', '制符', '布阵', '探索', '社交', '逃跑', '感知'] as const
 
 function environmentForType(type: string, round: JudgementRound): number {
   if (type === '修炼' || type === '突破') return round.环境.修炼
-  if (type === '炼制') return round.环境.炼制
+  if (type in CRAFT_DAO_KEYWORDS) return round.环境.炼制
   if (type === '战斗攻' || type === '战斗防') return round.环境.战斗
   return 0
 }
@@ -614,6 +595,7 @@ function environmentForType(type: string, round: JudgementRound): number {
 export function formatJudgementBlock(round: JudgementRound): string {
   // 按判定值分组（不再计算固定难度带）
   const groups = new Map<string, { types: string[]; base: number; env: number; value: number }>()
+  const craftNotes: string[] = []
   for (const type of PROMPT_TYPES) {
     const line = round.分项[type]
     const env = environmentForType(type, round)
@@ -622,6 +604,7 @@ export function formatJudgementBlock(round: JudgementRound): string {
     const group = groups.get(key)
     if (group) group.types.push(type)
     else groups.set(key, { types: [type], base: line.基础, env, value })
+    if (line.炼制提示) craftNotes.push(`- ${type}：${line.炼制提示}`)
   }
   const lines = [...groups.values()].map((group) => {
     return `- ${group.types.join('、')}: 判定值${group.value} (基础${group.base} + 环境${signed(group.env)} + 幸运${signed(round.幸运点)} + 状态${signed(round.状态修正)})`
@@ -637,10 +620,11 @@ export function formatJudgementBlock(round: JudgementRound): string {
 判定值 ≥ 难度值 → 成功；判定值 ≥ 难度+8 → 大成功；判定值 ≥ 难度+15 → 完美。
 判定值 < 难度-12 → 大失败；其他情况 → 失败。
 ${lines.join('\n')}
+${craftNotes.length ? `\n【无对应大道】\n${craftNotes.join('\n')}` : ''}
 
 【难度选择规则】
 **战斗/逃跑**：难度 = 对手基础值（从对手数据获取）。逃跑难度 = 对手基础值 × 0.7
-**炼制**：难度 = 物品品质固定值（见业务规则中的炼制难度表）
+**炼丹/炼器/制符/布阵**：难度 = 物品品质品级固定值（见业务规则中的炼制难度表），按炼制方式乘系数后再加减其他因素
 **社交**：难度 = 对方基础社交难度（5-90，取决于地位、立场、好感度）
 **修炼**：难度 = 你的修炼基础值 × 0.5
 **突破**：难度 = 目标境界标准值（小境界15-98，大境界25-220，见业务规则）

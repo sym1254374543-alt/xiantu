@@ -32,6 +32,21 @@ export const toNumber = (v: unknown, fallback = 0): number => {
   return Number.isFinite(n) ? n : fallback;
 };
 
+/**
+ * 功法修炼进度（0-100）。
+ * 角色.功法.功法进度.{物品ID} 是权威值（AI 升阶/熟练度都写这里），
+ * 背包物品上的 修炼进度 是历史字段，两者可能脱节，故优先读权威值。
+ */
+export function techniqueProgress(item: unknown, techniqueSystem: unknown): number {
+  const id = isObj(item) ? String(item.物品ID ?? '') : '';
+  const progressMap = isObj(techniqueSystem) ? (techniqueSystem as any).功法进度 : null;
+  const entry = id && isObj(progressMap) ? progressMap[id] : null;
+  const raw = isObj(entry)
+    ? (entry.熟练度 ?? entry.修炼进度)
+    : (isObj(item) ? item.修炼进度 : undefined);
+  return Math.max(0, Math.min(100, Math.round(toNumber(raw))));
+}
+
 // ─── 品级 ────────────────────────────────────────────────
 
 /** 品级文字：0 残缺 / 1–3 下品 / 4–6 中品 / 7–9 上品 / 10 极品；字符串原样返回 */

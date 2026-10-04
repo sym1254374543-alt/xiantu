@@ -171,7 +171,7 @@ import { useGameStateStore } from '@/stores/gameStateStore';
 import { useCharacterStore } from '@/stores/characterStore';
 import { EnhancedActionQueueManager } from '@/utils/enhancedActionQueue';
 import { qualityTone } from '@/utils/qualityTone';
-import { flattenEffect, qualityLabel, toNumber } from '@/utils/gameDisplay';
+import { flattenEffect, qualityLabel, techniqueProgress, toNumber } from '@/utils/gameDisplay';
 import { queueGameAction } from '@/utils/actionTexts';
 import { toast } from '@/utils/toast';
 import { askQuantity, confirmDialog } from '@/composables/useDialog';
@@ -208,7 +208,7 @@ const query = ref('');
 const detailOpen = ref(false);
 
 // ─── 展示辅助 ───
-const progressOf = (b: Book) => Math.max(0, Math.min(100, Math.round(toNumber(b.修炼进度))));
+const progressOf = (b: Book) => techniqueProgress(b, gs.techniqueSystem);
 const isCultivating = (b: Book) => (gs.cultivation as any)?.修炼功法?.物品ID === b.物品ID;
 const skillsOf = (b: Book) => (Array.isArray(b.功法技能) ? b.功法技能 : []);
 const sortedSkills = (b: Book) =>
