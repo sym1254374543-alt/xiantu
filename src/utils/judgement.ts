@@ -643,12 +643,26 @@ export function buildJudgementRound(input: {
   for (const dao of daoList) {
     if (!dao || typeof dao !== 'object') continue
     const daoName = String((dao as { 道名?: unknown }).道名 || '')
-    const stage = Number((dao as { 当前阶段?: unknown }).当前阶段 ?? 0)
+    const rawStage = Number((dao as { 当前阶段?: unknown }).当前阶段 ?? 0)
     const unlocked = (dao as { 是否解锁?: unknown }).是否解锁
     const stageList = (dao as { 阶段列表?: unknown[] }).阶段列表
-    const stageName = Array.isArray(stageList) && stageList[stage]
-      ? String((stageList[stage] as { 名称?: unknown }).名称 || '')
-      : ''
+    const listLen = Array.isArray(stageList) ? stageList.length : 0
+
+    // 当前阶段是权威值（AI 用 add 当前阶段 +1 推进）：设计为 6 阶段(0-5)，
+    // 不按阶段列表长度收敛，否则会把合法的第6阶段(5)误降为第5阶段(4)，静默丢基础值。
+    const stage = Number.isFinite(rawStage) ? Math.max(0, rawStage) : 0
+
+    // 阶段名仅用于展示：列表不足时取不到，回退为空（不报错）
+    let stageName = ''
+    if (listLen > 0) {
+      const idx = Math.min(stage, listLen - 1)
+      stageName = String((stageList![idx] as { 名称?: unknown })?.名称 || '')
+    }
+    if (listLen > 0 && stage >= listLen) {
+      diag.warn('判定·大道', `「${daoName}」当前阶段 ${stage} 已到第${stage + 1}阶，但阶段列表只有 ${listLen} 项`,
+        '大道应为 6 个阶段(0-5)，阶段列表缺项；基础值不受影响，仅阶段名缺失')
+    }
+
     if (daoName) {
       daoInfoList.push({
         大道名: daoName,

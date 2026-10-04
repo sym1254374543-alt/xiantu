@@ -110,6 +110,9 @@ const SUB_WEIGHT = 0.5
 /** 功法加成总上限，避免主修+多本辅修叠出失控数值 */
 const TECHNIQUE_RATIO_CAP = 1.5
 
+/** 单类型技能加成上限：多个天赋叠加时防止失控 */
+const SKILL_BONUS_CAP = 1.0
+
 /**
  * 境界 → 典型功法品质（NPC 无功法数据时的兜底）。
  * 仙品极其罕见，故元婴及以上统一按天品推算，仅渡劫按仙品。
@@ -303,7 +306,8 @@ export function calculateAbilityBonus(source: unknown): AbilityBonus {
         const actions = SKILL_TO_ACTION[skill] || []
         if (!actions.length || value === 0) continue
         for (const action of actions) {
-          result.技能加成[action] = (result.技能加成[action] || 0) + value
+          const prev = result.技能加成[action] || 0
+          result.技能加成[action] = Math.min(SKILL_BONUS_CAP, prev + value)
         }
         result.来源.push({
           名称: talentName, 类型: '技能加成',
@@ -312,6 +316,9 @@ export function calculateAbilityBonus(source: unknown): AbilityBonus {
       }
 
       if (kind === '特殊能力') {
+        // 特殊能力语义各异，不统一折算为判定加成：
+        // 「极品概率」影响品质、「寿命延长」与判定无关、「近战增幅」偏伤害、
+        // 「材料感知」偏感知能力——盲目并入会虚高且语义错误，故只列名与数值，交 AI 判断适用性。
         const abilityName = String(effect.名称 || '')
         const value = Number(effect.数值) || 0
         result.来源.push({
