@@ -435,7 +435,12 @@ function realmNameOf(attributes: unknown): string {
  * 匹配规则：大道名称中包含关键字（丹/药/医 对应炼丹，器/铸/锻 对应炼器，符 对应制符，阵 对应布阵）
  */
 function findMatchingDaoStage(daoList: DaoStageInfo[], craftType: string): number {
-  if (!daoList || daoList.length === 0) return -1  // -1 表示没有匹配的大道
+  console.log(`[大道匹配] 开始匹配，炼制类型="${craftType}"，大道列表:`, daoList)
+
+  if (!daoList || daoList.length === 0) {
+    console.log('[大道匹配] 没有大道数据，返回-1')
+    return -1
+  }
 
   // 定义炼制类型关键字映射（默认匹配"炼制"）
   const keywords: string[] = []
@@ -448,20 +453,24 @@ function findMatchingDaoStage(daoList: DaoStageInfo[], craftType: string): numbe
   } else if (craftType.includes('布阵') || craftType.includes('阵')) {
     keywords.push('阵')
   } else {
-    // 默认：查找任意炼制相关的大道
-    keywords.push('丹', '药', '器', '符', '阵', '炼', '铸', '锻')
+    // 默认：查找任意炼制相关的大道（更宽松的匹配）
+    keywords.push('丹', '药', '器', '符', '阵', '炼', '铸', '锻', '医', '道')
   }
+
+  console.log(`[大道匹配] 匹配关键字:`, keywords)
 
   // 查找匹配的大道
   for (const dao of daoList) {
     for (const keyword of keywords) {
       if (dao.大道名.includes(keyword)) {
+        console.log(`[大道匹配] ✅ 匹配成功！大道="${dao.大道名}"，关键字="${keyword}"，阶段=${dao.当前阶段}`)
         return dao.当前阶段
       }
     }
   }
 
-  return -1  // 没有匹配的大道
+  console.log('[大道匹配] ❌ 没有匹配的大道，返回-1')
+  return -1
 }
 
 export function buildJudgementRound(input: {
@@ -485,20 +494,40 @@ export function buildJudgementRound(input: {
 
   // 提取大道信息用于提示词展示
   const daoInfoList: DaoStageInfo[] = []
+
+  // 处理大道数据：支持数组格式和对象格式
+  let daoList: unknown[] = []
   if (Array.isArray(input.大道)) {
-    for (const dao of input.大道) {
-      if (!dao || typeof dao !== 'object') continue
-      const daoName = String((dao as { 道名?: unknown }).道名 || '')
-      const stage = Number((dao as { 当前阶段?: unknown }).当前阶段 ?? 0)
-      const stageList = (dao as { 阶段列表?: unknown[] }).阶段列表
-      const stageName = Array.isArray(stageList) && stageList[stage]
-        ? String((stageList[stage] as { 名称?: unknown }).名称 || '')
-        : ''
-      if (daoName) {
-        daoInfoList.push({ 大道名: daoName, 当前阶段: stage, 阶段名称: stageName })
-      }
+    daoList = input.大道
+  } else if (input.大道 && typeof input.大道 === 'object') {
+    // 对象格式：{ 大道列表: { 丹道: {...}, 剑道: {...} } }
+    const daoObj = input.大道 as Record<string, unknown>
+    const list = daoObj['大道列表']
+    if (list && typeof list === 'object' && !Array.isArray(list)) {
+      // 大道列表是对象，提取所有大道
+      daoList = Object.values(list)
+    } else if (Array.isArray(list)) {
+      daoList = list
     }
   }
+
+  console.log('[判定系统] 提取大道数据，原始input.大道:', input.大道)
+  console.log('[判定系统] 转换后的daoList:', daoList)
+
+  for (const dao of daoList) {
+    if (!dao || typeof dao !== 'object') continue
+    const daoName = String((dao as { 道名?: unknown }).道名 || '')
+    const stage = Number((dao as { 当前阶段?: unknown }).当前阶段 ?? 0)
+    const stageList = (dao as { 阶段列表?: unknown[] }).阶段列表
+    const stageName = Array.isArray(stageList) && stageList[stage]
+      ? String((stageList[stage] as { 名称?: unknown }).名称 || '')
+      : ''
+    if (daoName) {
+      daoInfoList.push({ 大道名: daoName, 当前阶段: stage, 阶段名称: stageName })
+    }
+  }
+
+  console.log('[判定系统] 最终daoInfoList:', daoInfoList)
 
   const 分项: Record<string, JudgementBaseLine> = {}
   for (const [type, weights] of Object.entries(TYPE_WEIGHTS)) {
