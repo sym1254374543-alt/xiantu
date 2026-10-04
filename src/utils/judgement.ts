@@ -46,8 +46,18 @@ const BASE_FLOOR = 10
 /** 与境界序号对齐：凡人0 … 渡劫9。同序号的武道境界共用这一档。 */
 const REALM_BONUS_BY_RANK = [0, 5, 12, 20, 30, 42, 55, 70, 79, 88]
 
-/** 大道阶段对应的炼制基础值：阶段0-5对应凡黄玄地天仙的上品难度 */
+/** 大道阶段对应的炼制基础值：阶段0-5对应凡黄玄地天仙的上品难度
+ * 阶段6及以上：超越仙品，使用仙品基础值+额外加成 */
 const DAO_STAGE_BASE = [12, 25, 45, 70, 100, 135]
+
+/** 获取大道阶段对应的基础值（兼容超出范围的阶段） */
+function getDaoStageBase(stage: number): number {
+  if (stage < 0) return 0
+  if (stage < DAO_STAGE_BASE.length) return DAO_STAGE_BASE[stage]
+  // 阶段6+：仙品基础值 + 每个额外阶段+20
+  const extraStages = stage - (DAO_STAGE_BASE.length - 1)
+  return DAO_STAGE_BASE[DAO_STAGE_BASE.length - 1] + extraStages * 20
+}
 
 export interface JudgementBaseLine {
   属性加权: number
@@ -541,9 +551,9 @@ export function buildJudgementRound(input: {
     if (type === '炼制') {
       const matchedStage = findMatchingDaoStage(daoInfoList, '炼制')
 
-      if (matchedStage >= 0 && matchedStage < DAO_STAGE_BASE.length) {
+      if (matchedStage >= 0) {
         // 有匹配的大道：使用大道阶段基础值 + 境界辅助（30%）
-        const daoBase = DAO_STAGE_BASE[matchedStage]
+        const daoBase = getDaoStageBase(matchedStage)
         actualBase = Math.round(daoBase + realmBonus * 0.3)
         daoStage = matchedStage
         console.log(`[炼制基础值] 大道阶段${matchedStage}，基础值=${daoBase}，境界辅助=${Math.round(realmBonus * 0.3)}，最终=${actualBase}`)
