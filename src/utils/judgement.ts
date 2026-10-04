@@ -46,9 +46,13 @@ const BASE_FLOOR = 10
 /** 与境界序号对齐：凡人0 … 渡劫9。同序号的武道境界共用这一档。 */
 const REALM_BONUS_BY_RANK = [0, 5, 12, 20, 30, 42, 55, 70, 79, 88]
 
+/** 大道阶段对应的炼制基础值（根据计划：阶段0-6对应凡黄玄地天仙神） */
+const DAO_STAGE_BASE = [0, 10, 20, 35, 55, 80, 110]
+
 export interface JudgementBaseLine {
   属性加权: number
   基础: number
+  大道阶段?: number  // 炼制类型特有：使用的大道阶段
 }
 
 export interface DaoStageInfo {
@@ -77,6 +81,164 @@ export interface JudgementRound {
 }
 
 const SIX_KEYS: SixSiKey[] = ['根骨', '灵性', '悟性', '气运', '魅力', '心性']
+
+/**
+ * 品质类型（凡黄玄地天仙神）
+ */
+export type QualityType = '凡品' | '黄品' | '玄品' | '地品' | '天品' | '仙品' | '神品'
+
+/**
+ * 品级类型（下品、中品、上品、极品）
+ */
+export type GradeType = '下品' | '中品' | '上品' | '极品'
+
+/**
+ * 炼制固定难度表（根据计划）
+ * 行：品质（凡黄玄地天仙神）
+ * 列：品级（下品、中品、上品、极品）
+ */
+const CRAFTING_DIFFICULTY_TABLE: Record<QualityType, Record<GradeType, number>> = {
+  '凡品': { '下品': 5, '中品': 8, '上品': 12, '极品': 18 },
+  '黄品': { '下品': 15, '中品': 20, '上品': 25, '极品': 35 },
+  '玄品': { '下品': 30, '中品': 38, '上品': 45, '极品': 60 },
+  '地品': { '下品': 50, '中品': 60, '上品': 70, '极品': 90 },
+  '天品': { '下品': 75, '中品': 88, '上品': 100, '极品': 125 },
+  '仙品': { '下品': 105, '中品': 120, '上品': 135, '极品': 160 },
+  '神品': { '下品': 150, '中品': 175, '上品': 200, '极品': 250 },
+}
+
+/**
+ * 获取炼制固定难度
+ * @param quality 品质（凡黄玄地天仙神）
+ * @param grade 品级（下品、中品、上品、极品）
+ * @returns 固定难度值
+ */
+export function getCraftingDifficulty(quality: QualityType, grade: GradeType = '中品'): number {
+  const qualityRow = CRAFTING_DIFFICULTY_TABLE[quality]
+  if (!qualityRow) {
+    console.warn(`[getCraftingDifficulty] 未知品质: ${quality}`)
+    return 50  // 默认难度
+  }
+  const difficulty = qualityRow[grade]
+  if (difficulty === undefined) {
+    console.warn(`[getCraftingDifficulty] 未知品级: ${grade}`)
+    return qualityRow['中品']  // 降级到中品
+  }
+  return difficulty
+}
+
+/**
+ * 战斗难度 = 对手基础值
+ * @param opponentBase 对手的基础值
+ * @returns 战斗难度
+ */
+export function getCombatDifficulty(opponentBase: number): number {
+  return opponentBase
+}
+
+/**
+ * 逃跑难度 = 对手基础值 × 0.7
+ * @param opponentBase 对手的基础值
+ * @returns 逃跑难度
+ */
+export function getEscapeDifficulty(opponentBase: number): number {
+  return Math.round(opponentBase * 0.7)
+}
+
+/**
+ * 社交难度计算
+ * @param baseDifficulty 基础社交难度（5-90，取决于对方地位和关系）
+ * @param favorability 好感度（可选，每10点调整±5难度）
+ * @param hasInterest 是否有利益诱惑（-10到-30）
+ * @param hasThreat 是否有威胁恐吓（-20）
+ * @param isHostile 是否完全对立（+30）
+ * @returns 最终社交难度
+ */
+export function getSocialDifficulty(
+  baseDifficulty: number,
+  favorability?: number,
+  hasInterest?: number,
+  hasThreat?: boolean,
+  isHostile?: boolean
+): number {
+  let difficulty = baseDifficulty
+  if (favorability !== undefined) {
+    difficulty += Math.round((50 - favorability) / 10) * 5
+  }
+  if (hasInterest) difficulty += hasInterest
+  if (hasThreat) difficulty -= 20
+  if (isHostile) difficulty += 30
+  return Math.max(5, difficulty)
+}
+
+/**
+ * 修炼难度 = 自己基础值 × 0.5
+ * @param ownBase 自己的修炼基础值
+ * @returns 修炼难度
+ */
+export function getCultivationDifficulty(ownBase: number): number {
+  return Math.round(ownBase * 0.5)
+}
+
+/** 突破难度表：目标境界 → {小阶段突破，大境界突破} */
+const BREAKTHROUGH_DIFFICULTY: Record<string, { small: number; major: number }> = {
+  '练气': { small: 15, major: 25 },
+  '筑基': { small: 22, major: 40 },
+  '金丹': { small: 30, major: 60 },
+  '元婴': { small: 40, major: 85 },
+  '化神': { small: 52, major: 115 },
+  '炼虚': { small: 65, major: 145 },
+  '合体': { small: 80, major: 180 },
+  '渡劫': { small: 98, major: 220 },
+}
+
+/**
+ * 突破难度计算
+ * @param targetRealm 目标境界名称
+ * @param isMajor 是否是大境界突破（如练气→筑基）
+ * @param conditionBonus 条件修正（丹药、秘法等，-40到+50）
+ * @returns 突破难度
+ */
+export function getBreakthroughDifficulty(
+  targetRealm: string,
+  isMajor: boolean = false,
+  conditionBonus: number = 0
+): number {
+  const config = BREAKTHROUGH_DIFFICULTY[targetRealm]
+  if (!config) {
+    console.warn(`[getBreakthroughDifficulty] 未知境界: ${targetRealm}`)
+    return 50
+  }
+  const baseDifficulty = isMajor ? config.major : config.small
+  return Math.max(10, baseDifficulty + conditionBonus)
+}
+
+/**
+ * 探索/感知难度计算
+ * @param targetType 探索目标类型（普通搜索、隐藏物品、破解阵法、感知NPC等）
+ * @param targetLevel 目标等级（如阵法品质、NPC境界基础值）
+ * @returns 探索难度
+ */
+export function getExploreDifficulty(targetType: '普通搜索' | '隐藏物品' | '破解阵法' | '感知NPC' | '洞悉宝物', targetLevel?: number | string): number {
+  switch (targetType) {
+    case '普通搜索':
+      return 15
+    case '隐藏物品':
+      return 30
+    case '破解阵法':
+      if (typeof targetLevel === 'string') {
+        const formationDifficulty: Record<string, number> = { '黄品': 25, '玄品': 45, '地品': 70, '天品': 100 }
+        return formationDifficulty[targetLevel] || 45
+      }
+      return 45
+    case '感知NPC':
+      return typeof targetLevel === 'number' ? targetLevel : 20
+    case '洞悉宝物':
+      return typeof targetLevel === 'string' ? getCraftingDifficulty(targetLevel as QualityType) : 30
+    default:
+      return 25
+  }
+}
 
 function num(value: unknown, fallback = 0): number {
   const n = typeof value === 'number' ? value : Number(value)
@@ -267,6 +429,41 @@ function realmNameOf(attributes: unknown): string {
   return ''
 }
 
+/**
+ * 查找与炼制类型匹配的大道，返回该大道的当前阶段
+ * 炼制类型包括：炼丹、炼器、制符、布阵等
+ * 匹配规则：大道名称中包含关键字（丹/药/医 对应炼丹，器/铸/锻 对应炼器，符 对应制符，阵 对应布阵）
+ */
+function findMatchingDaoStage(daoList: DaoStageInfo[], craftType: string): number {
+  if (!daoList || daoList.length === 0) return -1  // -1 表示没有匹配的大道
+
+  // 定义炼制类型关键字映射（默认匹配"炼制"）
+  const keywords: string[] = []
+  if (craftType.includes('炼丹') || craftType.includes('丹')) {
+    keywords.push('丹', '药', '医')
+  } else if (craftType.includes('炼器') || craftType.includes('器')) {
+    keywords.push('器', '铸', '锻')
+  } else if (craftType.includes('制符') || craftType.includes('符')) {
+    keywords.push('符')
+  } else if (craftType.includes('布阵') || craftType.includes('阵')) {
+    keywords.push('阵')
+  } else {
+    // 默认：查找任意炼制相关的大道
+    keywords.push('丹', '药', '器', '符', '阵', '炼', '铸', '锻')
+  }
+
+  // 查找匹配的大道
+  for (const dao of daoList) {
+    for (const keyword of keywords) {
+      if (dao.大道名.includes(keyword)) {
+        return dao.当前阶段
+      }
+    }
+  }
+
+  return -1  // 没有匹配的大道
+}
+
 export function buildJudgementRound(input: {
   先天六司?: unknown
   后天六司?: unknown
@@ -308,13 +505,37 @@ export function buildJudgementRound(input: {
     if (type === '战斗') continue
     const weighted = Math.round(weightedAttribute(attrs, weights))
 
-    // 基础值 = 底子 + 属性加权 + 境界加成（不再自动加大道加成）
-    const rawBase = BASE_FLOOR + weighted + realmBonus
+    let actualBase: number
+    let daoStage: number | undefined
 
-    // 应用境界压制（修炼和突破类不压制）
-    const actualBase = realmSuppressionBase(rawBase, realmName, input.目标境界, type)
+    // 炼制类型：基础值 = 大道阶段基础值 + 境界加成 × 0.3
+    if (type === '炼制') {
+      const matchedStage = findMatchingDaoStage(daoInfoList, '炼制')
 
-    分项[type] = { 属性加权: weighted, 基础: actualBase }
+      if (matchedStage >= 0 && matchedStage < DAO_STAGE_BASE.length) {
+        // 有匹配的大道：使用大道阶段基础值 + 境界辅助（30%）
+        const daoBase = DAO_STAGE_BASE[matchedStage]
+        actualBase = Math.round(daoBase + realmBonus * 0.3)
+        daoStage = matchedStage
+        console.log(`[炼制基础值] 大道阶段${matchedStage}，基础值=${daoBase}，境界辅助=${Math.round(realmBonus * 0.3)}，最终=${actualBase}`)
+      } else {
+        // 没有匹配的大道：使用极低基础值（几乎不可能成功）
+        actualBase = 5  // 只有底子，没有任何加成
+        console.log(`[炼制基础值] 没有匹配的大道，基础值=${actualBase}（几乎无法成功）`)
+      }
+    } else {
+      // 其他类型：基础值 = 底子 + 属性加权 + 境界加成
+      const rawBase = BASE_FLOOR + weighted + realmBonus
+
+      // 应用境界压制（修炼和突破类不压制）
+      actualBase = realmSuppressionBase(rawBase, realmName, input.目标境界, type)
+    }
+
+    分项[type] = {
+      属性加权: weighted,
+      基础: actualBase,
+      大道阶段: daoStage
+    }
   }
 
   return {
@@ -352,41 +573,39 @@ function environmentForType(type: string, round: JudgementRound): number {
 
 /** 贴在玩家操作旁边。同数值的类型合并成一行。正常行事用简单，够到所选难度就必须写成功。 */
 export function formatJudgementBlock(round: JudgementRound): string {
-  const groups = new Map<string, { types: string[]; base: number; env: number; value: number; easy: string; normal: string }>()
+  // 按判定值分组（不再计算固定难度带）
+  const groups = new Map<string, { types: string[]; base: number; env: number; value: number }>()
   for (const type of PROMPT_TYPES) {
     const line = round.分项[type]
     const env = environmentForType(type, round)
     const value = line.基础 + round.幸运点 + env + round.状态修正
-    const bands = difficultyBands(line.基础)
-    const easy = computeJudgementResult(value, bands.简单)
-    const normal = computeJudgementResult(value, bands.普通)
-    const key = `${line.基础}|${env}|${value}|${easy}|${normal}`
+    const key = `${line.基础}|${env}|${value}`
     const group = groups.get(key)
     if (group) group.types.push(type)
-    else groups.set(key, { types: [type], base: line.基础, env, value, easy, normal })
+    else groups.set(key, { types: [type], base: line.基础, env, value })
   }
   const lines = [...groups.values()].map((group) => {
-    const bands = difficultyBands(group.base)
-    return `- ${group.types.join('、')}: 判定值${group.value}，基础${group.base}，环境${signed(group.env)}。简单难度${bands.简单}→${group.easy}，普通难度${bands.普通}→${group.normal}`
+    return `- ${group.types.join('、')}: 判定值${group.value} (基础${group.base} + 环境${signed(group.env)} + 幸运${signed(round.幸运点)} + 状态${signed(round.状态修正)})`
   })
-
-  // 境界压制说明
-  const suppressionNote = round.目标境界
-    ? `\n【境界压制】你是${round.境界名}，目标是${round.目标境界}。上述基础值已根据境界差自动调整（战斗、社交、探索、感知、逃跑适用；修炼、突破不适用）。`
-    : ''
 
   // 大道阶段说明
   const daoNote = round.大道信息 && round.大道信息.length > 0
-    ? `\n【大道修为】当前大道：${round.大道信息.map(d => `${d.大道名}(阶段${d.当前阶段}${d.阶段名称 ? '-' + d.阶段名称 : ''})`).join('、')}。炼制类行动需根据大道匹配度调整难度（详见业务规则）。阶段0-5分别对应凡、黄、玄、地、天、仙品的炼制能力。`
+    ? `\n【大道修为】${round.大道信息.map(d => `${d.大道名}阶段${d.当前阶段}${d.阶段名称 ? '(' + d.阶段名称 + ')' : ''}`).join('、')}`
     : ''
 
   return `# 本回合判定（数值已掷好，禁止重算，禁止改结果）
-幸运${signed(round.幸运点)}，状态${signed(round.状态修正)}。判定值 = 基础 + 幸运 + 环境 + 状态。〔〕里必须写上幸运。
-本境界正常行事（修炼、赶路、打听、对等交手、炼制当前境界能接触的物品）用简单难度。普通只用于明确偏难但仍在本境界内的事。
-判定值 ≥ 所选难度就必须写成功、大成功或完美，禁止改成失败。只有越级、条件不足的强行突破、硬闯才用困难及以上。
-困难=基础+3，艰难=基础+6，极难=基础+9。禁止使用 10/20/35/50/70/90 这类固定难度。
-境界：${round.境界名}。凡人没有初期/中期/后期。${suppressionNote}${daoNote}
+境界：${round.境界名}。${daoNote}
+判定值 ≥ 难度值 → 成功；判定值 ≥ 难度+8 → 大成功；判定值 ≥ 难度+15 → 完美。
+判定值 < 难度-12 → 大失败；其他情况 → 失败。
 ${lines.join('\n')}
-有明确对手时：基础不变，按对手强弱选难度。对手弱一个大境界及以上免判；弱一两个小阶段=简单；同阶=普通；高一个小阶段=困难；高两个小阶段=艰难；高一个大境界=极难；高两个大境界及以上免判，只能逃、躲、求饶。逃跑比正面交手低两档。
-失败是吃亏，不是死：失败最多轻伤，大失败才重伤；气血 25% 以上时一次判定不会致死；濒死时也要留活路（逃脱、昏迷被救、被俘），除非玩家执意送死。`
+
+【难度选择规则】
+**战斗/逃跑**：难度 = 对手基础值（从对手数据获取）。逃跑难度 = 对手基础值 × 0.7
+**炼制**：难度 = 物品品质固定值（见业务规则中的炼制难度表）
+**社交**：难度 = 对方基础社交难度（5-90，取决于地位、立场、好感度）
+**修炼**：难度 = 你的修炼基础值 × 0.5
+**突破**：难度 = 目标境界标准值（小境界15-98，大境界25-220，见业务规则）
+**探索/感知**：难度 = 目标隐藏等级（普通15，隐藏物30，阵法25-100）
+
+具体难度值详见【业务规则】章节的各类型难度表。`
 }
