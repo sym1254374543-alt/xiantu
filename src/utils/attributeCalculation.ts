@@ -230,47 +230,70 @@ export function calculateOriginBonuses(saveData: SaveData): InnateAttributes {
 
   // 获取角色的出身
   const character = (saveData as any).角色?.身份 ?? null;
-  const originName = character?.出身 || '';
+  const origin = character?.出身;
 
   console.log('[出身加成计算] 开始计算出身加成');
-  console.log('[出身加成计算] 出身名称:', originName);
+  console.log('[出身加成计算] 出身数据:', origin);
 
-  if (!originName) {
+  if (!origin) {
     console.log('[出身加成计算] 没有出身信息');
     return bonuses;
   }
 
-  // 在LOCAL_ORIGINS中查找出身数据
-  const originData = LOCAL_ORIGINS.find(o => o.name === originName);
+  // 出身可能是字符串（出身名称）或对象（完整出身数据）
+  let originData: any = null;
+  let originName: string = '';
+
+  if (typeof origin === 'string') {
+    // 字符串格式：从 LOCAL_ORIGINS 查找
+    originName = origin;
+    originData = LOCAL_ORIGINS.find(o => o.name === originName);
+    console.log(`[出身加成计算] 出身名称: "${originName}", 在预定义列表中找到:`, !!originData);
+  } else if (typeof origin === 'object' && origin.name) {
+    // 对象格式：直接使用存档中的数据
+    originName = origin.name;
+    originData = origin;
+    console.log(`[出身加成计算] 出身名称: "${originName}", 使用存档中的完整数据`);
+  }
 
   if (!originData) {
     console.warn(`[出身加成计算] 未找到出身 "${originName}" 的数据`);
     return bonuses;
   }
 
-  console.log('[出身加成计算] 找到出身数据:', originData);
+  console.log('[出身加成计算] 使用的出身数据:', originData);
 
   // 应用出身的属性修正
   if (originData.attribute_modifiers) {
     const modifiers = originData.attribute_modifiers;
     console.log('[出身加成计算] 属性修正:', modifiers);
 
-    // 英文键名到中文键名的映射
+    // 键名映射：支持英文键名和中文键名
     const attrMap: Record<string, keyof InnateAttributes> = {
+      // 英文键名
       'root_bone': '根骨',
       'spirituality': '灵性',
       'comprehension': '悟性',
       'fortune': '气运',
       'luck': '气运',  // 兼容另一种命名
       'charm': '魅力',
-      'temperament': '心性'
+      'temperament': '心性',
+      // 中文键名（直接映射到自己）
+      '根骨': '根骨',
+      '灵性': '灵性',
+      '悟性': '悟性',
+      '气运': '气运',
+      '魅力': '魅力',
+      '心性': '心性'
     };
 
-    for (const [englishKey, value] of Object.entries(modifiers)) {
-      const chineseKey = attrMap[englishKey];
+    for (const [key, value] of Object.entries(modifiers)) {
+      const chineseKey = attrMap[key];
       if (chineseKey && typeof value === 'number') {
         bonuses[chineseKey] += value;
         console.log(`[出身加成计算] ${chineseKey} +${value}`);
+      } else if (!chineseKey) {
+        console.warn(`[出身加成计算] 未识别的属性键: "${key}"`);
       }
     }
   }
