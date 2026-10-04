@@ -57,17 +57,26 @@ const ABILITY_KEYWORDS: Record<string, AbilityActionType[]> = {
   体修天赋: ['战斗攻', '战斗防'],
 }
 
-/** 灵根品阶 → 资质加成比例（影响修炼与突破） */
+/**
+ * 灵根品阶 → 资质加成比例（影响修炼与突破）。
+ * 规范值域只有 7 种，来自 data/creationData.ts 的 LOCAL_SPIRIT_ROOTS：
+ * 凡品/下品/中品/上品/极品/神品/特殊。
+ *
+ * 注意：不要在此加入「地品/天品/仙品」——那是物品品质(凡黄玄地天仙神)，
+ * AI 误用到灵根上是数据错误，应由 NPC 生成规范 + 存档修复解决，而非在此兼容。
+ */
 const ROOT_TIER_BONUS: Record<string, number> = {
   凡品: 0,
   下品: 0.02,
   中品: 0.05,
   上品: 0.10,
   极品: 0.15,
-  天品: 0.22,
-  仙品: 0.30,
+  特殊: 0.20,
   神品: 0.40,
 }
+
+/** 非法品阶的保守兜底值（按中品计，并记入诊断告警） */
+const ROOT_TIER_FALLBACK = 0.05
 
 /** 功法品质 → 基础加成比例 */
 const TECHNIQUE_QUALITY_BONUS: Record<string, number> = {
@@ -366,12 +375,18 @@ export function calculateAbilityBonus(source: unknown): AbilityBonus {
   if (root && typeof root === 'object') {
     const rootTier = String((root as any).tier || (root as any).品级 || '')
     const rootName = String((root as any).name || (root as any).名称 || '灵根')
-    const bonus = ROOT_TIER_BONUS[rootTier] || 0
-    if (bonus > 0) {
+    const known = rootTier in ROOT_TIER_BONUS
+    const bonus = known ? ROOT_TIER_BONUS[rootTier] : ROOT_TIER_FALLBACK
+    if (known) {
+      if (bonus > 0) {
+        result.资质加成 += bonus
+        result.资质来源.push(`${rootName}(${rootTier} +${Math.round(bonus * 100)}%)`)
+      }
+    } else {
+      // 未知品阶：给保守默认值而非归零，避免 AI 换用新词导致加成凭空消失
       result.资质加成 += bonus
-      result.资质来源.push(`${rootName}(${rootTier} +${Math.round(bonus * 100)}%)`)
-    } else if (rootTier && !(rootTier in ROOT_TIER_BONUS)) {
-      diag.warn('能力·灵根', `灵根品阶「${rootTier}」无法识别，灵根加成按 0 计`,
+      result.资质来源.push(`${rootName}(${rootTier}·未知品阶按中品 +${Math.round(bonus * 100)}%)`)
+      diag.warn('能力·灵根', `灵根品阶「${rootTier}」无法识别，暂按中品 ${Math.round(bonus * 100)}% 计`,
         `灵根="${rootName}"，已知品阶：${Object.keys(ROOT_TIER_BONUS).join('/')}`)
     }
   }

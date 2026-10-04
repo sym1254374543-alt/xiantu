@@ -72,6 +72,9 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
       repaired.角色.身份.后天六司 = { 根骨: 0, 灵性: 0, 悟性: 0, 气运: 0, 魅力: 0, 心性: 0 };
     }
 
+    // 修复玩家灵根品阶（同 NPC：把误用的物品品质改回规范值）
+    repairSpiritRootTier(repaired.角色.身份 as any);
+
     // --- 属性 ---
     if (!repaired.角色.属性 || typeof repaired.角色.属性 !== 'object') {
       console.warn('[数据修复] 属性缺失，创建默认值');
@@ -495,6 +498,51 @@ function repairItem(item: Item): Item {
   return repaired;
 }
 
+/** 灵根品阶规范值域（来源：data/creationData.ts 的 LOCAL_SPIRIT_ROOTS） */
+const CANONICAL_ROOT_TIERS = ['凡品', '下品', '中品', '上品', '极品', '神品', '特殊']
+
+/**
+ * 物品品质(7级) → 灵根品阶(7级) 的位置映射。
+ * AI 常把物品品质误用到灵根上，两者恰好都是7级且首级同为凡品，按位置对齐最稳：
+ *   凡品→凡品 黄品→下品 玄品→中品 地品→上品 天品→极品 仙品→极品 神品→神品
+ */
+const QUALITY_TO_ROOT_TIER: Record<string, string> = {
+  黄品: '下品',
+  玄品: '中品',
+  地品: '上品',
+  天品: '极品',
+  仙品: '极品',
+}
+
+/**
+ * 修复灵根品阶：把误用的物品品质改回灵根规范值域。
+ * 就地修改传入对象的 灵根.品级 / 灵根.tier。
+ * @returns 是否发生了修复
+ */
+export function repairSpiritRootTier(holder: any): boolean {
+  const root = holder?.灵根
+  if (!root || typeof root !== 'object') return false
+
+  // 同时处理两种写法
+  for (const key of ['品级', 'tier']) {
+    const raw = root[key]
+    if (typeof raw !== 'string') continue
+    const tier = raw.trim()
+    if (!tier || CANONICAL_ROOT_TIERS.includes(tier)) continue
+
+    const mapped = QUALITY_TO_ROOT_TIER[tier]
+    if (mapped) {
+      root[key] = mapped
+      console.log(`[数据修复] 灵根品阶纠正: 「${tier}」→「${mapped}」(${root.名称 || root.name || ''})`)
+    } else {
+      root[key] = '中品'
+      console.warn(`[数据修复] 灵根品阶「${tier}」无法识别，按中品兜底(${root.名称 || root.name || ''})`)
+    }
+    return true
+  }
+  return false
+}
+
 /**
  * 修复NPC数据
  */
@@ -504,6 +552,9 @@ function repairNpc(npc: NpcProfile): NpcProfile {
   // 确保基础字段
   repaired.名字 = repaired.名字 || '无名';
   repaired.性别 = repaired.性别 || '男';
+
+  // 修复灵根品阶（AI 误把物品品质当灵根品阶时改回规范值）
+  repairSpiritRootTier(repaired as any);
 
   // 年龄已自动从出生日期计算,删除年龄字段
 
