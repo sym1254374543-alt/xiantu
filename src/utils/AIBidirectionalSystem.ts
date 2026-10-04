@@ -608,6 +608,7 @@ class AIBidirectionalSystemClass {
         属性: attributes,
         效果: stateForAI.角色?.效果,
         灵气浓度: stateForAI.角色?.位置?.灵气浓度,
+        大道: stateForAI.角色?.大道,  // 传入大道数据
       });
       coreStatusSummary += `\n\n${formatJudgementBlock(judgementRound)}`;
       // --- 结束 ---

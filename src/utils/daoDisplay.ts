@@ -33,15 +33,17 @@ export function daoCategory(name: string, dao?: Partial<DaoData> | null): string
 export const daoCategoryLabel = (key: string) => DAO_CATEGORIES.find((c) => c.key === key)?.label || '其他';
 
 /**
- * 历史存档里 当前阶段 0-based、1-based 都有：
- * 0 保留为初始阶段；大于 0 的值按类型约定（1 = 入门）换成数组下标。
+ * 获取大道当前阶段索引（用于访问阶段列表数组）
+ * 当前阶段字段从0开始，直接对应数组索引：0=阶段列表[0](入门), 1=阶段列表[1](初窥)...
  */
 export function daoStageIndex(dao: Partial<DaoData> | null | undefined): number {
   const len = dao?.阶段列表?.length || 0;
   const raw = Number(dao?.当前阶段 ?? 0);
-  if (!Number.isFinite(raw) || raw <= 0) return 0;
-  if (!len) return Math.min(raw - 1, DAO_STAGE_NAMES.length - 1);
-  return Math.min(Math.max(raw - 1, 0), len - 1);
+  if (!Number.isFinite(raw) || raw < 0) return 0;
+
+  // 直接使用当前阶段值作为索引，不做转换
+  if (!len) return Math.min(raw, DAO_STAGE_NAMES.length - 1);
+  return Math.min(raw, len - 1);
 }
 
 export function daoStageName(dao: Partial<DaoData> | null | undefined): string {
