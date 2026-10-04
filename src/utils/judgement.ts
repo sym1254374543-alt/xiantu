@@ -46,8 +46,8 @@ const BASE_FLOOR = 10
 /** 与境界序号对齐：凡人0 … 渡劫9。同序号的武道境界共用这一档。 */
 const REALM_BONUS_BY_RANK = [0, 5, 12, 20, 30, 42, 55, 70, 79, 88]
 
-/** 大道阶段对应的炼制基础值（根据计划：阶段0-6对应凡黄玄地天仙神） */
-const DAO_STAGE_BASE = [0, 10, 20, 35, 55, 80, 110]
+/** 大道阶段对应的炼制基础值：阶段0-5对应凡黄玄地天仙的上品难度 */
+const DAO_STAGE_BASE = [12, 25, 45, 70, 100, 135]
 
 export interface JudgementBaseLine {
   属性加权: number
