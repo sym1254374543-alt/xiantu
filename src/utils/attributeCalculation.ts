@@ -231,9 +231,9 @@ export function calculateOriginBonuses(saveData: SaveData): InnateAttributes {
     心性: 0
   };
 
-  // 获取角色的出身
+  // 获取角色的出生（注意：存档中的字段是"出生"而不是"出身"）
   const character = (saveData as any).角色?.身份 ?? null;
-  const origin = character?.出身;
+  const origin = character?.出生 || character?.出身; // 兼容两种字段名
 
   console.log('[出身加成计算] 开始计算出身加成');
   console.log('[出身加成计算] 出身数据:', origin);
