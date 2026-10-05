@@ -274,7 +274,7 @@ const createDefaultWorldConfig = () => ({
   majorFactionsCount: 5,
   totalLocations: 12,
   secretRealmsCount: 5,
-  continentCount: 4,
+  continentCount: 7, // 默认七大洲
   generateOnlyContinents: true // 默认开启仅生成大陆
 });
 
@@ -468,7 +468,7 @@ function randomizeConfig() {
   const factionOptions = [3, 4, 5, 6, 7];
   const locationOptions = [8, 10, 12, 15, 18];
   const realmOptions = [3, 4, 5, 6, 8];
-  const continentOptions = [3, 4, 5, 6];
+  const continentOptions = [3, 4, 5, 6, 7];
 
   worldConfig.value = {
     majorFactionsCount: factionOptions[Math.floor(Math.random() * factionOptions.length)],

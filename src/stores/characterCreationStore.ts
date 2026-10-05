@@ -131,7 +131,7 @@ export const useCharacterCreationStore = defineStore('characterCreation', () => 
     majorFactionsCount: 5, // 默认5个主要势力
     totalLocations: 12, // 默认12个地点
     secretRealmsCount: 5, // 默认5个秘境
-    continentCount: 4, // 默认4片大陆
+    continentCount: 7, // 默认七片大陆（对应真实七大洲）
     generateOnlyContinents: true // 默认只生成大陆（开局优化）
   });
 
@@ -933,7 +933,7 @@ export const useCharacterCreationStore = defineStore('characterCreation', () => 
       majorFactionsCount: 5,
       totalLocations: 12,
       secretRealmsCount: 5,
-      continentCount: 4,
+      continentCount: 7, // 默认七片大陆（对应真实七大洲）
       generateOnlyContinents: true // 默认只生成大陆（开局优化）
     };
   }
