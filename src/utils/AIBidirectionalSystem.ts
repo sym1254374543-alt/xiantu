@@ -180,16 +180,26 @@ class AIBidirectionalSystemClass {
 
   private buildFocusedNpcPrompt(stateForAI: any): string {
     const focusedNames = this.getFocusedNpcNames(stateForAI);
-    const list = focusedNames.length > 0 ? focusedNames.map(name => `- ${name}`).join('\n') : '- （无）';
+    if (focusedNames.length === 0) return '';
+    const list = focusedNames.map(name => `- ${name}`).join('\n');
     return [
-      '# 🔎 实时关注NPC（必须更新）',
-      '以下NPC即使不在玩家身边，本回合也要按时间推移推演其动态并写入 tavern_commands：',
+      '# 🔎 实时关注NPC（必须逐人推演并更新）',
+      '以下NPC即使不在玩家身边，本回合也要按时间推移推演其动态，并写入 tavern_commands：',
       list,
-      '要求：',
-      '- 名单为（无）时忽略本节',
-      '- 每人至少 set 社交.关系.{NPC名}.当前内心想法（{NPC名}换成真实名字）',
-      '- 位置 / 外貌状态 / 属性有变化时一并更新',
-      '- 名单中每个人都要覆盖'
+      '',
+      '要求（名单中每个人都要覆盖，不可遗漏）：',
+      '1. 内心想法（必更）：set 社交.关系.{NPC名}.当前内心想法（{NPC名}换成真实名字）',
+      '2. 修为进展（必推演）：NPC也在随时间修炼。用 add 推进 社交.关系.{NPC名}.境界.当前进度，',
+      '   增量与本次经过的时间相称（数日+1~5，数月+10~30，闭关/机缘可更多，无事发生时也可为0）',
+      '   突破的前提是**有功法**：该NPC持有或有途径修习对应功法，修为才可能精进与突破；',
+      '   只有资源与心境而没有功法，修为停滞，进度可推进但不能突破',
+      '   进度达到"下一级所需"且条件成熟（功法+资源+心境）才可突破：',
+      '   set 境界.阶段 为下一小阶段并把 当前进度 归零；大境界突破须有机缘+秘法+资源，不可随意',
+      '   已到当前境界圆满者，若无突破契机则停在圆满，不要凭空越阶',
+      '3. 资产变化（有理由才动）：交易/赏赐/发放→增，消费/失窃/被勒索→减',
+      '   add 社交.关系.{NPC名}.背包.货币.{币种}.数量；无理由不得变动',
+      '4. 位置 / 外貌状态 / 属性（有变化时一并更新）',
+      '禁止：只更新内心而不推演修为；也禁止为了"有变化"而强行让NPC突破或暴富'
     ].join('\n');
   }
 
@@ -690,7 +700,8 @@ ${stateJsonString}
       };
       const injects: PromptInject[] = [
         { content: systemPrompt, role: 'system', depth: 4, position: 'in_chat' },
-        { content: focusedNpcPrompt, role: 'system', depth: 3, position: 'in_chat' },
+        // 无关注NPC且无中期记忆格式时为空串，过滤掉避免注入空消息
+        ...(focusedNpcPrompt.trim() ? [{ content: focusedNpcPrompt, role: 'system' as const, depth: 3, position: 'in_chat' as const }] : []),
         ...(recentEventsInject ? [recentEventsInject] : []),
         judgementInject,
         INPUT_GUARD_INJECT,

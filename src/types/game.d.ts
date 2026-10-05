@@ -272,7 +272,7 @@ export interface Inventory extends AIMetadata {
   };
   /**
    * 新货币系统（可选，兼容旧存档）
-   * - key = 币种ID（建议：无点号`.`，例如：灵石_下品 / 铜币 / 银两 / 金锭）
+   * - key = 币种ID（建议：无点号`.`，例如：灵石_下品 / 人民币 / 美元）
    * - value = 币种结构体（包含价值度/数量/描述等）
    */
   货币?: Record<string, CurrencyAsset>;
@@ -788,7 +788,7 @@ export interface WorldInfo {
 export interface EconomyState extends AIMetadata {
   /**
    * 全局货币波动系数（1=基准，建议范围 0.6~1.6）
-   * key = 币种ID（如：灵石_下品 / 铜币）
+   * key = 币种ID（如：灵石_下品 / 人民币）
    */
   货币波动?: Record<string, number>;
   /**

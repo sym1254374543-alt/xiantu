@@ -225,6 +225,7 @@ import { qualityTone, qualityKey } from '@/utils/qualityTone';
 import { flattenEffect, qualityLabel, techniqueProgress, toNumber } from '@/utils/gameDisplay';
 import { isTavernEnv } from '@/utils/tavern';
 import { useWallet } from '@/composables/useWallet';
+import { currencySystemOf } from '@/utils/currencySystem';
 import { usePageActions } from '@/composables/usePageActions';
 import { askQuantity, confirmDialog } from '@/composables/useDialog';
 import PageTabs from '@/components/game/PageTabs.vue';
@@ -314,14 +315,12 @@ const formatNumber = (n: number) => {
   return v >= 10000 ? `${(v / 10000).toFixed(v >= 100000 ? 1 : 2)}万` : v.toLocaleString('zh-CN');
 };
 
-/** 除基准体系外的其它货币体系合计（灵石与法币互不兑换，故分开列示） */
-const SYSTEM_LABELS: Record<string, string> = { 灵石: '灵石', 法币: '法币', 凡俗: '凡俗' };
+/** 除基准体系外的其它货币体系合计（灵石与现代货币互不兑换，故分开列示） */
 const otherSystemTotals = computed(() => {
-  const baseSys = wallet.baseId.value.startsWith('灵石') ? '灵石'
-    : ['人民币', '美元', '欧元'].includes(wallet.baseId.value) ? '法币' : '凡俗';
+  const baseSys = currencySystemOf(wallet.baseId.value);
   return Object.entries(wallet.totalsBySystem.value)
     .filter(([sys, v]) => sys !== baseSys && v > 0)
-    .map(([sys, v]) => ({ name: SYSTEM_LABELS[sys] || sys, value: v }));
+    .map(([sys, v]) => ({ name: sys, value: v }));
 });
 
 // ─── 物品操作（带忙碌锁） ───

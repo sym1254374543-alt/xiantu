@@ -14,19 +14,15 @@ const num = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) 
 
 /**
  * 相邻面额：兑换 = 往上换，分解 = 往下拆，手续费 2%。
- * 兑换只在**同一体系内**进行（灵石⇄灵石、法币⇄法币、凡俗⇄凡俗），
+ * 兑换只在**同一体系内**进行（灵石⇄灵石、现代货币⇄现代货币），
  * 体系之间互不兑换——灵气复苏的地球上，凡人根本不知灵石为何物。
- * 面额比不再写死 100，改由价值度推导，这样法币（人民币⇄美元 7.2）也能用。
+ * 面额比由价值度推导，故灵石（100）与现代货币（7.2）都能正确工作。
  */
 const LADDER: Record<string, { up?: string; down?: string }> = {
   灵石_下品: { up: '灵石_中品' },
   灵石_中品: { up: '灵石_上品', down: '灵石_下品' },
   灵石_上品: { up: '灵石_极品', down: '灵石_中品' },
   灵石_极品: { down: '灵石_上品' },
-  铜币: { up: '银两' },
-  银两: { up: '金锭', down: '铜币' },
-  金锭: { down: '银两' },
-  // 法币体系
   人民币: { up: '美元' },
   美元: { up: '欧元', down: '人民币' },
   欧元: { down: '美元' },
@@ -34,7 +30,6 @@ const LADDER: Record<string, { up?: string; down?: string }> = {
 const ORDER = [
   '灵石_下品', '灵石_中品', '灵石_上品', '灵石_极品',
   '人民币', '美元', '欧元',
-  '铜币', '银两', '金锭',
 ];
 const FEE = 0.02;
 
@@ -92,15 +87,15 @@ export function useWallet() {
 
   /**
    * 折算为「本体系内的基准单位」（不跨体系）。
-   * 灵石体系基准=下品灵石；法币体系基准=人民币；凡俗体系基准=铜币。
+   * 灵石体系基准=下品灵石；现代货币体系基准=人民币。
    * 原先用全局基准币种折算，会把「1 元」和「1 下品灵石」算术相加，
    * 违反「灵石与钱不互通」的设定。
    */
   const systemBaseOf = (id: string): string => {
     const sys = currencySystemOf(id)
     if (sys === '灵石') return '灵石_下品'
-    if (sys === '法币') return '人民币'
-    return '铜币'
+    if (sys === '现代货币') return '人民币'
+    return id // 「其他」体系（旧存档遗留币种）以自身为基准，不混入任何体系
   }
 
   const toBase = (id: string, amount: number) => {
