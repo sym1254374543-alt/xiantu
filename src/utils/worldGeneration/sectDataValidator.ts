@@ -3,6 +3,8 @@
  * 确保AI生成的宗门数据逻辑一致性
  */
 
+import { FACTION_RANKS } from '@/utils/prompts/definitions/valueDomains';
+
 // 境界等级映射 - 支持带"期"和不带"期"的格式
 // 注意：同一境界的不同阶段（初期、中期、后期、圆满、极境）都算同一等级
 const REALM_LEVELS: Record<string, number> = {
@@ -26,6 +28,162 @@ const REALM_LEVELS: Record<string, number> = {
  */
 function getRealmLevel(realm: string): number {
   return REALM_LEVELS[realm] || 0;
+}
+
+/** 大境界名（用于拼接合法的阶段写法）。剥掉小阶段后缀与"期"字 */
+const BIG_REALMS = ['练气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '渡劫'];
+function bigRealmOf(realm: string): string {
+  const name = String(realm || '').replace(/期$/, '');
+  return BIG_REALMS.find((r) => name.startsWith(r)) || name;
+}
+
+/**
+ * 取境界分布里的最高境界（按 level 比较，取 level 最大者）。
+ * 旧实现用"严格大于"遍历，遇到同 level 的多个 key 会停在**第一个**，
+ * 因而"练气初期"常被当成最高境界——此处需返回 level 最高、且同 level 时
+ * 取小阶段更靠后的那个。
+ */
+function highestRealmIn(dist: Record<string, number> | undefined): string {
+  if (!dist || typeof dist !== 'object') return '';
+  let best = '';
+  let bestLevel = 0;
+  let bestStage = -1;
+  for (const [realm, count] of Object.entries(dist)) {
+    if (!(Number(count) > 0)) continue;
+    const level = getRealmLevel(realm);
+    if (level === 0) continue;
+    const stageText = String(realm).replace(/期$/, '').slice(bigRealmOf(realm).length);
+    const stage = REALM_STAGE_ORDER.indexOf(stageText);
+    if (level > bestLevel || (level === bestLevel && stage > bestStage)) {
+      bestLevel = level;
+      bestStage = stage;
+      best = realm;
+    }
+  }
+  return best;
+}
+
+/** 小阶段顺序（用于同境界内比较） */
+const REALM_STAGE_ORDER = ['初期', '中期', '后期', '圆满', '极境'];
+
+/**
+ * 以「最强修为」为准校验成员分层：任何一层的境界都不得超过天花板。
+ * 越界的层直接压到天花板对应的境界（人数不动，只改境界标注）。
+ */
+function validateRealmDistribution(sectData: any): void {
+  const leadership = sectData?.领导层;
+  const tiers = sectData?.成员数量?.成员 ?? sectData?.成员数量?.职位;
+  if (!leadership || !Array.isArray(tiers)) return;
+
+  const ceiling = String(leadership.最强修为 || '');
+  const ceilingLevel = getRealmLevel(ceiling);
+  if (ceilingLevel <= 0) return;
+
+  for (const tier of tiers) {
+    const level = getRealmLevel(String(tier?.境界 || ''));
+    if (level > ceilingLevel) {
+      console.warn(`[宗门验证] ${sectData.名称}: 成员层「${tier.名称}」境界 "${tier.境界}" 高于最强修为 "${ceiling}"，已压至 "${ceiling}"`);
+      tier.境界 = ceiling;
+    }
+  }
+}
+
+/**
+ * 归一化成员构成到「按职位分层」结构（成员:[{名称,人数,境界}]）。
+ * 兼容旧存档的两种写法：
+ *  - 按职位 + 按境界 两套映射（旧地球存档）
+ *  - byPosition / byRealm 英文键（旧生成器）
+ * 新结构只有一个「人数」口径，故旧数据只取「按职位」的人数，
+ * 境界按层级从高到低就近分配（顶层给最强修为，底层给凡人）。
+ */
+function normalizeMemberTiers(sectData: any): void {
+  const mc = sectData?.成员数量;
+  if (!mc || typeof mc !== 'object') return;
+
+  // 已是新结构
+  if (Array.isArray(mc.成员) || Array.isArray(mc.职位)) {
+    if (!Array.isArray(mc.成员) && Array.isArray(mc.职位)) mc.成员 = mc.职位;
+    recomputeTotal(sectData);
+    return;
+  }
+
+  const byPosition = mc.按职位 || mc.byPosition;
+  if (!byPosition || typeof byPosition !== 'object') return;
+
+  const ceiling = String(sectData?.领导层?.最强修为 || '').trim();
+  const ceilingLevel = getRealmLevel(ceiling);
+  const bigCeiling = ceilingLevel > 0 ? bigRealmOf(ceiling) : '';
+
+  const entries = Object.entries(byPosition as Record<string, any>)
+    .map(([name, n]) => ({ name, count: Number(n) || 0 }))
+    .filter((e) => e.count > 0)
+    .sort((a, b) => b.count - a.count); // 人数多的在底，少的在顶
+
+  // 层级境界由低到高排布（不采用旧数据里的境界 key——它们本身可能是损坏值，
+  // 如"练气初圆满"）：人数最多的层是凡人，顶层给最强修为，中间层递推。
+  const top = ceilingLevel > 0 ? `${bigCeiling}圆满` : '凡人';
+  const mid = ceilingLevel > 1 ? `${bigCeiling}初期` : '练气初期';
+  const ladder: string[] = ['凡人', mid, top];
+
+  mc.成员 = entries.map((e, i) => ({
+    名称: e.name,
+    人数: e.count,
+    // entries 已按人数降序：i=0 人数最多 → 取阶梯最低档
+    境界: ladder[Math.min(i, ladder.length - 1)],
+  }));
+
+  delete mc.按境界;
+  delete mc.byRealm;
+  delete mc.按职位;
+  delete mc.byPosition;
+  recomputeTotal(sectData);
+  console.warn(`[宗门验证] ${sectData.名称}: 成员构成已归一化为按职位分层（旧的两套统计不再维护）`);
+}
+
+/** 总数 = 各层人数之和 */
+function recomputeTotal(sectData: any): void {
+  const tiers = sectData?.成员数量?.成员;
+  if (!Array.isArray(tiers)) return;
+  const sum = tiers.reduce((s: number, t: any) => s + (Number(t?.人数) || 0), 0);
+  if (sum > 0) sectData.成员数量.总数 = sum;
+}
+
+/**
+ * 领导层字段名规范化。
+ *
+ * 旧键名 宗主/宗主修为/副宗主 是为"修仙宗门"起的，但地上还有财团、官方机构、
+ * 研究所等现代组织——界面写"宗主：沈建国"就出戏了。
+ * 这里按势力类型给出通用的 **首领/首领修为/副手**，同时保留旧键名作为别名，
+ * 避免破坏仍在读 宗主 的地方（sectLeadershipUtils / sectContentService / 各视图）。
+ */
+function normalizeLeadership(sectData: any): void {
+  const L = sectData?.领导层;
+  if (!L || typeof L !== 'object') return;
+
+  const ranks = FACTION_RANKS[String(sectData.类型 || '')] || FACTION_RANKS['修仙宗门'];
+  const leaderTitle = ranks?.首领 || '首领';
+  const deputyTitle = ranks?.副手 || '副手';
+
+  // 首领 = 旧宗主（若 AI 已按新称谓写 首领，则反向兼容）
+  const leaderName = L.首领 ?? L.宗主;
+  const leaderRealm = L.首领修为 ?? L.宗主修为;
+  const deputyName = L.副手 ?? L.副宗主;
+
+  if (leaderName !== undefined) {
+    L.首领 = leaderName;
+    L.宗主 = leaderName; // 别名：旧读取方仍可用
+  }
+  if (leaderRealm !== undefined) {
+    L.首领修为 = leaderRealm;
+    L.宗主修为 = leaderRealm;
+  }
+  if (deputyName !== undefined) {
+    L.副手 = deputyName;
+    L.副宗主 = deputyName;
+  }
+  // 供界面显示该势力应有的首领称谓（财团=董事长、家族=家主……）
+  L.首领称谓 = leaderTitle;
+  L.副手称谓 = deputyTitle;
 }
 
 /**
@@ -69,103 +227,54 @@ export function validateAndFixSectRealmData(sectData: any): any {
     delete sectData.memberCount;
   }
 
-  // 处理已存在的成员数量字段中的英文子字段
-  if (sectData.成员数量) {
-    const memberCount = sectData.成员数量;
+  // 成员构成：归一化为「按职位分层」单一结构（兼容旧的两套统计写法）
+  // 注意：必须放在「最强修为」修正**之后**——分层境界要按天花板推算，
+  // 若先跑，损坏的天花板（如"练气初圆满"）会让 all 层退化成「凡人」。
+  if (sectData.成员数量?.total !== undefined && sectData.成员数量.总数 === undefined) {
+    sectData.成员数量.总数 = sectData.成员数量.total;
+  }
 
-    // 转换 total -> 总数
-    if (memberCount.total !== undefined && memberCount.总数 === undefined) {
-      memberCount.总数 = memberCount.total;
-    }
+  // ─── 最强修为是权威值 ───
+  // 它表示该势力的战力天花板，成员分布应当服从于它；
+  // 旧实现反过来用"分布里的最高 key"去覆盖它，且拼接时把"练气初期"拼成
+  // "练气初圆满"这类不存在的阶段——此处改为：以 最强修为 为准，缺失/非法时才推断。
+  const leadership = sectData.领导层;
+  if (leadership) {
+    const declared = String(leadership.最强修为 || '').trim();
+    const declaredLevel = getRealmLevel(declared);
 
-    // 转换 byRealm -> 按境界
-    if (memberCount.byRealm && !memberCount.按境界) {
-      memberCount.按境界 = memberCount.byRealm;
-    }
-
-    // 转换 byPosition -> 按职位
-    if (memberCount.byPosition && !memberCount.按职位) {
-      memberCount.按职位 = memberCount.byPosition;
+    if (declaredLevel > 0) {
+      // 最强修为合法：仅校验一致性，不覆盖
+      const masterLevel = getRealmLevel(leadership.宗主修为 || '');
+      if (masterLevel > declaredLevel) {
+        // 宗主比"最强"还强，说明最强修为写低了——按宗主修为抬高
+        leadership.最强修为 = leadership.宗主修为;
+        console.warn(`[宗门验证] ${sectData.名称}: 宗主修为高于最强修为，已抬高最强修为为 "${leadership.宗主修为}"`);
+      } else if (!leadership.宗主修为) {
+        leadership.宗主修为 = declared;
+      }
+    } else {
+      // 最强修为缺失或非法：优先取宗主修为，其次取分布中的最高境界
+      const fallback = leadership.宗主修为 || highestRealmIn(sectData.成员数量?.按境界);
+      if (fallback) {
+        const fixed = /^(凡人|练气|筑基|金丹|元婴|化神|炼虚|合体|渡劫)$/.test(String(fallback).trim())
+          ? String(fallback).trim()
+          : `${bigRealmOf(fallback)}圆满`;
+        leadership.最强修为 = fixed;
+        if (!leadership.宗主修为) leadership.宗主修为 = fixed;
+        console.warn(`[宗门验证] ${sectData.名称}: 最强修为缺失/非法("${declared}")，已推断为 "${fixed}"`);
+      }
     }
   }
 
-  // 获取最强修为等级
-  const maxRealm = sectData.领导层?.最强修为 || sectData.最强修为;
-  const maxLevel = getRealmLevel(maxRealm);
+  // 归一化成员构成（须在天花板修正之后，分层境界才推得准）
+  normalizeMemberTiers(sectData);
 
-  console.log(`[宗门验证] ${sectData.名称}: 最强修为="${maxRealm}" → 等级=${maxLevel}`);
-  console.log(`[宗门验证] ${sectData.名称}: 原始境界分布=`, sectData.成员数量?.按境界);
+  // 领导层字段名规范化：按势力类型给出 首领/副手（保留旧键名作别名）
+  normalizeLeadership(sectData);
 
-  // 🔥 智能修复：根据境界分布自动设置最强修为
-  if (sectData.成员数量?.按境界) {
-    const realmDist = sectData.成员数量.按境界;
-
-    // 找出境界分布中的最高境界
-    let highestRealmLevel = 0;
-    let highestRealmName = '';
-
-    Object.keys(realmDist).forEach(realm => {
-      const count = realmDist[realm];
-      if (count > 0) {
-        const realmLevel = getRealmLevel(realm);
-        if (realmLevel > highestRealmLevel) {
-          highestRealmLevel = realmLevel;
-          highestRealmName = realm;
-        }
-      }
-    });
-
-    // 如果找到了最高境界，用它来更新最强修为
-    if (highestRealmLevel > 0 && highestRealmName) {
-      // 将"练气期"转换为"练气圆满"等更合理的描述
-      const realmNameWithoutSuffix = highestRealmName.replace('期', '');
-      const correctedMaxRealm = `${realmNameWithoutSuffix}圆满`;
-
-      // 更新leadership中的最强修为
-      if (sectData.领导层) {
-        const oldMaxRealm = sectData.领导层.最强修为;
-        sectData.领导层.最强修为 = correctedMaxRealm;
-        console.log(`[宗门验证] ${sectData.名称}: 根据境界分布自动修正最强修为: "${oldMaxRealm}" → "${correctedMaxRealm}"`);
-
-        // 如果宗主修为低于最强修为，也更新宗主修为
-        const masterRealmLevel = getRealmLevel(sectData.领导层.宗主修为 || '');
-        if (masterRealmLevel < highestRealmLevel) {
-          sectData.领导层.宗主修为 = correctedMaxRealm;
-          console.log(`[宗门验证] ${sectData.名称}: 同时更新宗主修为为: "${correctedMaxRealm}"`);
-        }
-      }
-    }
-
-    console.log(`[宗门验证] ${sectData.名称}: 境界分布包含:`, Object.keys(realmDist).filter(r => realmDist[r] > 0));
-  }
-
-  console.log(`[宗门验证] ${sectData.名称}: 验证后境界分布=`, sectData.成员数量?.按境界);
-
-  // 验证长老数量与高境界修士数量的一致性
-  if (sectData.领导层?.长老数量 && sectData.成员数量?.按境界) {
-    const elderCount = sectData.领导层.长老数量;
-    const realmDist = sectData.成员数量.按境界;
-    
-    // 计算元婴期及以上的修士总数
-    let highRealmCount = 0;
-    Object.keys(realmDist).forEach(realm => {
-      const realmLevel = getRealmLevel(realm);
-      if (realmLevel >= 4) {
-        highRealmCount += realmDist[realm] || 0;
-      }
-    });
-
-    if (highRealmCount > elderCount * 1.5) {
-      const ratio = elderCount * 1.2 / highRealmCount;
-      Object.keys(realmDist).forEach(realm => {
-        const realmLevel = getRealmLevel(realm);
-        if (realmLevel >= 4) {
-          const originalCount = realmDist[realm];
-          realmDist[realm] = Math.max(1, Math.round(originalCount * ratio));
-        }
-      });
-    }
-  }
+  // 校验：成员分层不得出现高于最强修为的境界（以最强修为为准，压回天花板）
+  validateRealmDistribution(sectData);
 
   return sectData;
 }

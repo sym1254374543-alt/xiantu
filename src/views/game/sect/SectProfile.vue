@@ -34,8 +34,8 @@
     <section v-if="leadership" class="gm-section">
       <h4 class="gm-label">领导层</h4>
       <dl class="gm-kv">
-        <dt>宗主</dt><dd>{{ leadership.宗主 }}<small v-if="leadership.宗主修为"> · {{ leadership.宗主修为 }}</small></dd>
-        <template v-if="leadership.副宗主"><dt>副宗主</dt><dd>{{ leadership.副宗主 }}</dd></template>
+        <dt>{{ leaderTitle }}</dt><dd>{{ leadership.首领 ?? leadership.宗主 }}<small v-if="leaderRealm"> · {{ leaderRealm }}</small></dd>
+        <template v-if="deputyName"><dt>{{ deputyTitle }}</dt><dd>{{ deputyName }}</dd></template>
         <template v-if="leadership.太上长老"><dt>太上长老</dt><dd>{{ leadership.太上长老 }}<small v-if="leadership.太上长老修为"> · {{ leadership.太上长老修为 }}</small></dd></template>
         <template v-if="leadership.圣女"><dt>圣女</dt><dd>{{ leadership.圣女 }}</dd></template>
         <template v-if="leadership.圣子"><dt>圣子</dt><dd>{{ leadership.圣子 }}</dd></template>
@@ -47,7 +47,7 @@
       <h4 class="gm-label">成员构成</h4>
       <div class="bars">
         <div v-for="p in positionCounts" :key="p.name" class="bar">
-          <span>{{ p.name }}</span>
+          <span>{{ p.name }}<small v-if="p.境界"> · {{ p.境界 }}</small></span>
           <span class="bar-track"><span :style="{ width: p.percent + '%' }"></span></span>
           <b>{{ p.count }}</b>
         </div>
@@ -85,10 +85,26 @@
 import { computed } from 'vue';
 import type { WorldFaction } from '@/types/game';
 import SealBadge from '@/components/game/SealBadge.vue';
+import { FACTION_RANKS } from '@/utils/prompts/definitions/valueDomains';
 
 const props = defineProps<{ sect: WorldFaction; current?: boolean }>();
 
 const leadership = computed<any>(() => (props.sect as any).领导层 || (props.sect as any).leadership || null);
+
+// 首领称谓按势力类型显示（财团=董事长、家族=家主、局=局长……），
+// 旧存档没有 首领称谓 时，退回到按类型推断
+const leaderTitle = computed(() => {
+  const explicit = leadership.value?.首领称谓;
+  if (explicit) return explicit;
+  return FACTION_RANKS[String((props.sect as any).类型 || '')]?.首领 || '宗主';
+});
+const deputyTitle = computed(() => {
+  const explicit = leadership.value?.副手称谓;
+  if (explicit) return explicit;
+  return FACTION_RANKS[String((props.sect as any).类型 || '')]?.副手 || '副宗主';
+});
+const deputyName = computed(() => leadership.value?.副手 ?? leadership.value?.副宗主);
+const leaderRealm = computed(() => leadership.value?.首领修为 ?? leadership.value?.宗主修为);
 
 const relationText = computed(() => {
   const r = props.sect.与玩家关系 as unknown;
@@ -112,8 +128,19 @@ const specialties = computed(() => {
 const count = computed<any>(() => props.sect.成员数量 || {});
 const memberTotal = computed(() => Number(count.value.总数 ?? count.value.total ?? 0) || 0);
 const positionCounts = computed(() => {
-  const by = count.value.按职位 || count.value.byPosition || {};
-  const entries = Object.entries(by as Record<string, number>).map(([name, n]) => ({ name, count: Number(n) || 0 })).filter((e) => e.count > 0);
+  // 新结构：成员:[{名称,人数,境界}]；兼容旧的 按职位 映射
+  const tiers = count.value.成员 || count.value.职位;
+  let entries: { name: string; count: number; 境界: string }[];
+  if (Array.isArray(tiers)) {
+    entries = tiers
+      .map((t: any) => ({ name: String(t?.名称 || ''), count: Number(t?.人数) || 0, 境界: String(t?.境界 || '') }))
+      .filter((e) => e.name && e.count > 0);
+  } else {
+    const by = count.value.按职位 || count.value.byPosition || {};
+    entries = Object.entries(by as Record<string, number>)
+      .map(([name, n]) => ({ name, count: Number(n) || 0, 境界: '' }))
+      .filter((e) => e.count > 0);
+  }
   const max = Math.max(1, ...entries.map((e) => e.count));
   return entries.map((e) => ({ ...e, percent: Math.max(3, Math.round((e.count / max) * 100)) }));
 });

@@ -13,6 +13,8 @@ import {
   SPIRIT_ROOT_ALL_TIERS,
   ITEM_QUALITIES,
   DAO_STAGE_COUNT,
+  REALMS,
+  REALM_STAGES,
   isValidSpiritRootTier,
   isValidItemQuality,
 } from '@/utils/prompts/definitions/valueDomains'
@@ -84,6 +86,38 @@ export function guardItemQuality(item: any, who = ''): boolean {
 }
 
 /**
+ * 校验并纠正境界写法（就地修改）。
+ * 合法写法只有「大境界」或「大境界+小阶段」，如 练气 / 练气初期。
+ * 曾出现"练气初圆满"这类由错误拼接产出的非法阶段（剥掉"期"字后直接加"圆满"），
+ * 此处统一纠正：能识别大境界的，归一到「大境界圆满」。
+ */
+export function guardRealmValue(holder: any, field: string, who = ''): boolean {
+  if (!holder || typeof holder !== 'object') return false
+  const raw = holder[field]
+  if (typeof raw !== 'string' || !raw.trim()) return false
+  const t = raw.trim()
+
+  // 合法：大境界名，或 大境界+小阶段
+  if (REALMS.includes(t as any)) return false
+  const big = REALMS.find((r) => t.startsWith(r))
+  if (big) {
+    const rest = t.slice(big.length)
+    if (rest === '') return false
+    if ((REALM_STAGES as readonly string[]).includes(rest)) return false
+  }
+
+  // 非法：能识别大境界则修正为「大境界圆满」，否则只报问题
+  if (big) {
+    holder[field] = `${big}圆满`
+    diag.warn('值域·境界', `${who}${field}「${t}」不是合法阶段，已纠正为「${big}圆满」`,
+      `合法写法：${REALMS.join('/')} 或 大境界+${REALM_STAGES.join('/')}`)
+    return true
+  }
+  diag.warn('值域·境界', `${who}${field}「${t}」无法识别`, `合法写法：${REALMS.join('/')}`)
+  return false
+}
+
+/**
  * 校验大道阶段列表（不改值，只报问题）
  * 大道阶段固定 6 个（下标 0-5），阶段列表不足会导致阶段名缺失。
  */
@@ -121,6 +155,13 @@ export function guardEntityDomains(source: any, who = ''): void {
 
   guardSpiritRootTier(identity, who)
 
+  // 境界对象的 名称/阶段 校验（NPC 与玩家同构）
+  const realm = source.角色?.属性?.境界 ?? source.境界
+  if (realm && typeof realm === 'object') {
+    guardRealmValue(realm, '名称', who)
+    guardRealmValue(realm, '阶段', who)
+  }
+
   const bag = source.角色?.背包?.物品 ?? source.背包?.物品
   if (bag && typeof bag === 'object') {
     for (const item of Object.values(bag as Record<string, any>)) {
@@ -130,4 +171,52 @@ export function guardEntityDomains(source: any, who = ''): void {
 
   const daoList = source.角色?.大道?.大道列表
   if (daoList) guardDaoStages(daoList, who)
+
+  // 功法装备标记
+  guardTechniqueEquip(source, who)
+}
+
+/**
+ * 校验势力领导层的修为字段（世界.信息.势力信息 里的 宗主修为/最强修为）。
+ * 这两处历史上出现过"练气初圆满"这类非法阶段。
+ */
+export function guardFactionRealm(source: any, who = ''): boolean {
+  const list = source?.世界?.信息?.势力信息
+  if (!Array.isArray(list)) return false
+  let changed = false
+  for (const f of list) {
+    const L = f?.领导层
+    if (!L || typeof L !== 'object') continue
+    const name = String(f?.名称 || '')
+    for (const field of ['宗主修为', '最强修为']) {
+      if (guardRealmValue(L, field, `${who}${name} `)) changed = true
+      // leadership（英文镜像字段）同步
+      const mirror = f?.leadership
+      if (mirror && typeof mirror === 'object' && typeof mirror[field] === 'string') {
+        mirror[field] = L[field]
+      }
+    }
+  }
+  return changed
+}
+
+/**
+ * 校验功法装备标记：有功法物品但未标 已装备 时提示（能力计算会兜底取用，
+ * 但标记缺失会让 AI 与界面显示的"修炼中"失真）。
+ */
+export function guardTechniqueEquip(source: any, who = ''): boolean {
+  const bag = source.角色?.背包?.物品 ?? source.背包?.物品
+  if (!bag || typeof bag !== 'object') return false
+  const list = Object.values(bag as Record<string, any>).filter((i) => i?.类型 === '功法')
+  if (list.length === 0) return false
+
+  const tech = source.角色?.功法 ?? source.功法 ?? {}
+  const hasMain = !!(tech.功法套装?.主修 || tech.当前功法ID)
+  const hasEquipped = list.some((i) => i?.已装备 === true)
+  if (!hasMain && !hasEquipped) {
+    diag.warn('值域·功法', `${who}有 ${list.length} 部功法但未标记主修/已装备`,
+      `建议补 set 背包.物品.{功法ID}.已装备=true 与 功法.功法套装.主修；否则界面不会显示"修炼中"`)
+    return true
+  }
+  return false
 }

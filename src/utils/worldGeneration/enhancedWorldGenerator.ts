@@ -364,11 +364,15 @@ export class EnhancedWorldGenerator {
             }
           : undefined;
 
+        // 成员构成：按职位分层 [{名称,人数,境界}]。两种键名都接，旧的两套统计
+        // （按境界/按职位）由 sectDataValidator 归一化，这里只透传原始数据。
+        const rawTiers = rawMemberCount?.成员 ?? rawMemberCount?.职位;
         const memberCount = rawMemberCount
           ? {
               total: Number(rawMemberCount.total ?? rawMemberCount.总数) || 0,
-              byRealm: rawMemberCount.byRealm || rawMemberCount.按境界 || {},
-              byPosition: rawByPosition || {}
+              成员: Array.isArray(rawTiers) ? rawTiers : undefined,
+              byPosition: rawByPosition || undefined,
+              byRealm: rawMemberCount.byRealm || rawMemberCount.按境界 || undefined,
             }
           : undefined;
 
@@ -398,9 +402,9 @@ export class EnhancedWorldGenerator {
           成员数量: memberCount
             ? {
                 总数: memberCount.total,
-                按境界: memberCount.byRealm,
-                按职位: memberCount.byPosition,
-                ...memberCount
+                成员: memberCount.成员,
+                ...(memberCount.byPosition ? { 按职位: memberCount.byPosition } : {}),
+                ...(memberCount.byRealm ? { 按境界: memberCount.byRealm } : {}),
               }
             : undefined,
           memberCount,

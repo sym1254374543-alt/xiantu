@@ -375,14 +375,23 @@ export interface SectInfo {
   };
 }
 
-/** 宗门成员数量统计 */
+/** 成员分层：一层职位对应一档境界，人数只有一个口径 */
+export interface SectMemberTier {
+  名称: string;   // 职位/身份，按势力类型取（局长/处长/专员、董事长/主管/职员……）
+  人数: number;
+  境界: string;   // 该层成员的大致修为（大境界或大境界+小阶段）
+}
+
+/**
+ * 宗门成员构成。
+ * 设计要点：**按职位分层，每层给境界**——只有一个「人数」口径，
+ * 不再像旧版那样维护"按境界"与"按职位"两套独立统计并强求两者之和相等
+ * （现实中它们是同一批人的两个切面，硬凑相等会产出无意义的数字）。
+ */
 export interface SectMemberCount {
-  总数?: number; // 总成员数
-  total?: number; // 英文字段名兼容
-  按境界?: Record<RealmLevel, number>; // 按境界统计
-  byRealm?: Record<string, number>; // 英文字段名兼容
-  按职位?: Record<SectPosition, number>; // 按职位统计
-  byPosition?: Record<string, number>; // 英文字段名兼容
+  总数?: number; // 总成员数 = 各层人数之和
+  成员?: SectMemberTier[]; // 分层明细（权威结构）
+  职位?: SectMemberTier[]; // 别名，兼容 AI 可能写的键名
 }
 
 /** 宗门系统数据 */
