@@ -305,8 +305,11 @@ export interface SkillInfo {
 
 // --- 宗门系统相关类型 ---
 
-/** 宗门类型（与 valueDomains 的 FACTION_TYPES 对应：修仙宗门=正道宗门、修仙世家=世家、商会组织=商会） */
-export type SectType = '正道宗门' | '魔道宗门' | '中立宗门' | '商会' | '世家' | '散修联盟' | '妖族' | '其他';
+/**
+ * 玩家所属势力的类型（与 valueDomains 的 FACTION_TYPES 对齐）。
+ * 魔道/正道/中立等旧称一律归入「修仙宗门」——同属古老道统，只是立场不同，不单列类型。
+ */
+export type SectType = '官方机构' | '财团企业' | '家族世家' | '研究所学院' | '教团结社' | '妖族' | '修仙宗门' | '其他';
 
 /** 宗门职位 */
 export type SectPosition =
@@ -694,7 +697,8 @@ export interface WorldContinent {
 export interface WorldFaction {
   id?: string | number; // 增加可选的id字段
   名称: string;
-  类型: '修仙宗门' | '魔道宗门' | '中立宗门' | '修仙世家' | '魔道势力' | '商会组织' | '散修联盟' | string;
+  /** 取值见 valueDomains 的 FACTION_TYPES（含 | string 以兼容旧存档与自定义） */
+  类型: '官方机构' | '财团企业' | '家族世家' | '研究所学院' | '教团结社' | '妖族' | '修仙宗门' | string;
   等级: '超级' | '一流' | '二流' | '三流' | string;
   所在大洲?: string; // 增加可选的所在大洲字段
   位置?: string | { x: number; y: number }; // 支持字符串描述或坐标

@@ -56,16 +56,15 @@ const _SECT_LEVEL_MULTIPLIER: Record<string, number> = {
  * 宗门类型修正系数
  */
 const SECT_TYPE_MODIFIER: Record<string, number> = {
-  '修仙宗门': 1.0,
-  '正道宗门': 1.0,
-  '魔道宗门': 1.1,
-  '魔道势力': 1.1,
-  '修仙世家': 0.9,
-  '世家': 0.9,
-  '商会': 0.7,
-  '商会组织': 0.7,
-  '中立宗门': 0.85,
-  '散修联盟': 0.75
+  // 现代地球势力
+  官方机构: 1.1,
+  财团企业: 1.0,
+  家族世家: 0.9,
+  研究所学院: 0.85,
+  教团结社: 0.95,
+  妖族: 1.05,
+  // 古老道统（游戏中复苏后出现）
+  修仙宗门: 1.0,
 };
 
 /**
@@ -127,24 +126,28 @@ function calculateSectPower(data: SectCalculationData): number {
   
   let typeBonus = 0;
   switch (data.类型) {
-    case '魔道宗门':
-    case '魔道势力':
-      typeBonus = 3;
+    // 现代地球势力（新兴组织与已现形妖族）
+    case '官方机构':
+      typeBonus = 2;
       break;
-    case '正道宗门':
-    case '修仙宗门':
+    case '教团结社':
       typeBonus = 1;
       break;
-    case '修仙世家':
-    case '世家':
+    case '妖族':
+      typeBonus = 1;
+      break;
+    case '财团企业':
       typeBonus = -1;
       break;
-    case '商会':
-    case '商会组织':
+    case '家族世家':
+      typeBonus = -1;
+      break;
+    case '研究所学院':
       typeBonus = -3;
       break;
-    case '散修联盟':
-      typeBonus = -2;
+    // 古老道统（游戏中复苏后才会出现）
+    case '修仙宗门':
+      typeBonus = 1;
       break;
     default:
       typeBonus = 0;

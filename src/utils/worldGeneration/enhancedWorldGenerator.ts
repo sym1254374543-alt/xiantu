@@ -234,10 +234,10 @@ export class EnhancedWorldGenerator {
         defaultPrompt += `
 
 【特殊要求】
-请务必在势力列表中包含一个名为"合欢宗"的宗门：
-- 类型：魔道宗门 或 中立宗门
+请务必在势力列表中包含一个名为"合欢宗"的势力：
+- 类型：修仙宗门（古老道统，此彩蛋视为已提前复苏）
 - 等级：二流 或 三流（必须明确填写，不能为空）
-- 特色：以双修采补闻名，宗门风气开放
+- 特色：以双修采补闻名，风气开放
 - 领导层中必须包含"圣女"字段（圣女姓名）`;
       }
 
@@ -334,7 +334,7 @@ export class EnhancedWorldGenerator {
         // 计算声望与综合战力（若可）
         const calcInput: SectCalculationData = {
           名称: faction.name || faction.名称,
-          类型: faction.type || faction.类型 || '修仙宗门',
+          类型: faction.type || faction.类型 || '官方机构',
           等级: faction.level || faction.等级 || '三流',
           宗主修为: rawLeadership?.宗主修为,
           最强修为: rawLeadership?.最强修为,
@@ -625,7 +625,7 @@ export async function generateRealmMap(config: RealmMapGenConfig): Promise<Realm
 
       const factions = (raw.factions ?? []).map((f: any) => ({
         名称: f.name ?? f.名称 ?? '未命名势力',
-        类型: f.type ?? f.类型 ?? '修仙宗门',
+        类型: f.type ?? f.类型 ?? '官方机构',
         等级: f.level ?? f.等级 ?? '三流',
         描述: f.description ?? f.描述 ?? '',
         特色: f.feature ?? f.特色 ?? '',
