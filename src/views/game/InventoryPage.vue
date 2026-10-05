@@ -149,7 +149,7 @@
     <div v-else class="wealth">
       <header class="wealth-head">
         <div>
-          <span class="gm-label plain">总价值</span>
+          <span class="gm-label plain">{{ wallet.baseName.value }}体系合计</span>
           <p class="wealth-total"><b>{{ formatNumber(wallet.totalInBase.value) }}</b><span>{{ wallet.baseName.value }}</span></p>
         </div>
         <p class="market">
@@ -158,6 +158,14 @@
           <span>· {{ wallet.market.value.stable ? '汇率平稳' : `市场倍率 ×${wallet.market.value.multiplier.toFixed(3)}` }}</span>
         </p>
       </header>
+
+      <!-- 多体系分开列示：灵石与法币互不兑换，不做合并折算 -->
+      <ul v-if="otherSystemTotals.length" class="system-totals">
+        <li v-for="s in otherSystemTotals" :key="s.name">
+          <span>{{ s.name }}体系</span>
+          <b>{{ formatNumber(s.value) }}</b>
+        </li>
+      </ul>
 
       <EmptyState v-if="!wallet.rows.value.length" glyph="财" title="囊中羞涩" desc="还没有任何钱财" compact />
       <ul v-else class="coins">
@@ -305,6 +313,16 @@ const formatNumber = (n: number) => {
   const v = Math.round(n * 100) / 100;
   return v >= 10000 ? `${(v / 10000).toFixed(v >= 100000 ? 1 : 2)}万` : v.toLocaleString('zh-CN');
 };
+
+/** 除基准体系外的其它货币体系合计（灵石与法币互不兑换，故分开列示） */
+const SYSTEM_LABELS: Record<string, string> = { 灵石: '灵石', 法币: '法币', 凡俗: '凡俗' };
+const otherSystemTotals = computed(() => {
+  const baseSys = wallet.baseId.value.startsWith('灵石') ? '灵石'
+    : ['人民币', '美元', '欧元'].includes(wallet.baseId.value) ? '法币' : '凡俗';
+  return Object.entries(wallet.totalsBySystem.value)
+    .filter(([sys, v]) => sys !== baseSys && v > 0)
+    .map(([sys, v]) => ({ name: SYSTEM_LABELS[sys] || sys, value: v }));
+});
 
 // ─── 物品操作（带忙碌锁） ───
 const busyIds = ref(new Set<string>());
@@ -736,6 +754,29 @@ usePageActions(() => [
 
 .market span {
   color: var(--cc-text-2);
+}
+
+/* 其它货币体系合计：灵石与法币互不兑换，分开列示 */
+.system-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--cc-text-2);
+}
+
+.system-totals li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35rem;
+}
+
+.system-totals b {
+  color: var(--cc-gold);
+  font-variant-numeric: tabular-nums;
 }
 
 .coins {
