@@ -124,7 +124,7 @@
           <p class="info-type">{{ picked.类型 || picked.type || '势力' }}<template v-if="picked.等级"> · {{ picked.等级 }}</template></p>
           <p class="gm-prose">{{ picked.description || picked.描述 }}</p>
           <dl class="gm-kv info-kv">
-            <template v-if="leaderOf(picked)"><dt>掌门</dt><dd>{{ leaderOf(picked)!.宗主 }}<small v-if="leaderOf(picked)!.宗主修为"> · {{ leaderOf(picked)!.宗主修为 }}</small></dd></template>
+            <template v-if="leaderOf(picked)"><dt>首领</dt><dd>{{ leaderOf(picked)!.宗主 }}<small v-if="leaderOf(picked)!.宗主修为"> · {{ leaderOf(picked)!.宗主修为 }}</small></dd></template>
             <template v-if="memberCountOf(picked)"><dt>成员</dt><dd>{{ memberCountOf(picked) }} 人</dd></template>
             <template v-if="picked.与玩家关系"><dt>与你</dt><dd>{{ picked.与玩家关系 }}</dd></template>
           </dl>
@@ -196,6 +196,7 @@ import { confirmDialog } from '@/composables/useDialog';
 import { toast } from '@/utils/toast';
 import SealBadge from '@/components/game/SealBadge.vue';
 import RegionMapView from './map/RegionMapView.vue';
+import { FACTION_TYPES } from '@/utils/prompts/definitions/valueDomains';
 
 defineOptions({ name: 'WorldMapPage' });
 
@@ -206,11 +207,11 @@ const gen = useMapGeneration(map);
 const unmapped = useUnmappedNpcs(map);
 
 const LEGEND = [
-  { label: '名山大川', icon: Mountain, color: 'var(--gm-life)' },
-  { label: '宗门势力', icon: Building2, color: 'var(--cc-gold)' },
-  { label: '城镇坊市', icon: Store, color: 'var(--gm-mp)' },
-  { label: '洞天福地', icon: Sparkles, color: 'var(--gm-cultivation)' },
-  { label: '奇珍异地', icon: Gem, color: 'var(--q-xian)' },
+  { label: '山川湖海', icon: Mountain, color: 'var(--gm-life)' },
+  { label: '势力据点', icon: Building2, color: 'var(--cc-gold)' },
+  { label: '城镇都市', icon: Store, color: 'var(--gm-mp)' },
+  { label: '灵脉宝地', icon: Sparkles, color: 'var(--gm-cultivation)' },
+  { label: '异变区域', icon: Gem, color: 'var(--q-xian)' },
   { label: '凶险之地', icon: AlertTriangle, color: 'var(--cc-danger)' },
   { label: '其他特殊', icon: Zap, color: 'var(--cc-warning)' },
   { label: '你的位置', icon: User, color: 'var(--cc-seal)' },
@@ -219,7 +220,7 @@ const LEGEND = [
 const legendShut = ref(false);
 
 const TYPE_NAMES: Record<string, string> = {
-  natural_landmark: '名山大川', sect_power: '宗门势力', city_town: '城镇坊市', blessed_land: '洞天福地', treasure_land: '奇珍异地',
+  natural_landmark: '山川湖海', sect_power: '势力据点', city_town: '城镇都市', blessed_land: '灵脉宝地', treasure_land: '异变区域',
   dangerous_area: '凶险之地', special_other: '其他特殊',
 };
 const typeName = (t: string) => TYPE_NAMES[t] || t || '未知类型';
@@ -228,8 +229,11 @@ const leaderOf = (p: any) => p?.领导层 || p?.leadership || null;
 const memberCountOf = (p: any) => p?.成员数量?.总数 ?? p?.成员数量?.total ?? p?.memberCount?.total ?? null;
 const specialtiesOf = (p: any) => [...new Set([...list(p?.特色列表), ...list(p?.特色)])];
 
+// 势力判定：类型取自值域总表（唯一来源），并兼容依据领导层/成员数推断
 const isFaction = (l: any) =>
-  ['修仙宗门', '魔道宗门', '修仙世家', '散修联盟', '商会', '妖族势力'].includes(l?.类型) || l?.type === 'sect_power' || !!(l?.leadership || l?.领导层 || l?.memberCount || l?.成员数量);
+  (FACTION_TYPES as readonly string[]).includes(l?.类型) ||
+  l?.type === 'sect_power' ||
+  !!(l?.leadership || l?.领导层 || l?.memberCount || l?.成员数量);
 
 // ─── 画布 ───
 const canvasEl = ref<HTMLCanvasElement | null>(null);

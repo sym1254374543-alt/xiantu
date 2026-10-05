@@ -79,18 +79,55 @@ export const SKILL_RESOURCES = ['灵气', '神识', '气血', '寿元'] as const
 
 // ─── 势力 ────────────────────────────────────────────────
 /**
- * 世界势力类型（AI 生成与档案存储统一用这一套）。
+ * 世界势力类型（AI 生成与档案存储统一用这一套）。仙凡融合：现代组织与古老道统并存。
  * 此前存在三套互不兼容的写法（SectType / WorldFaction.类型 / 生成提示词），已统一。
  */
-export const FACTION_TYPES = ['修仙宗门', '魔道宗门', '中立宗门', '修仙世家', '魔道势力', '商会组织', '散修联盟', '妖族'] as const
+export const FACTION_TYPES = [
+  '官方机构', '财团企业', '家族世家', '研究所学院', '教团结社', '妖族',
+  '修仙宗门',
+] as const
+
+/**
+ * 开局即可出现（灵气复苏后新兴的现代组织，与已现形的妖族）。
+ * 古老道统沉睡未醒，不可在开局登场。
+ */
+export const FACTION_TYPES_INITIAL = [
+  '官方机构', '财团企业', '家族世家', '研究所学院', '教团结社', '妖族',
+] as const
+
+/**
+ * 须在游戏过程中逐步复苏/现世（沉睡的古老道统）。
+ * 起初至多是遗迹、传说、尚未苏醒的传承；随剧情推进才可能浮现。
+ */
+export const FACTION_TYPES_LATENT = ['修仙宗门'] as const
+
 /** 势力等级 */
 export const FACTION_LEVELS = ['超级', '一流', '二流', '三流'] as const
 /** 势力与玩家关系 */
 export const FACTION_RELATIONS = ['敌对', '中立', '友好'] as const
 
+/**
+ * 各势力类型的职位称谓（首领/副手/骨干/成员）。
+ * 现代组织用现代职务，古老道统保留旧称——不要把"宗主/长老"套到财团上。
+ */
+export const FACTION_RANKS: Record<string, { 首领: string; 副手: string; 骨干: string; 成员: string }> = {
+  官方机构: { 首领: '局长', 副手: '副局长', 骨干: '处长', 成员: '专员' },
+  财团企业: { 首领: '董事长', 副手: '总裁', 骨干: '部门主管', 成员: '职员' },
+  家族世家: { 首领: '家主', 副手: '长老', 骨干: '执事', 成员: '族人' },
+  研究所学院: { 首领: '所长', 副手: '副所长', 骨干: '研究员', 成员: '助理研究员' },
+  教团结社: { 首领: '教主', 副手: '护法', 骨干: '祭司', 成员: '信众' },
+  妖族: { 首领: '妖王', 副手: '大妖', 骨干: '妖将', 成员: '小妖' },
+  修仙宗门: { 首领: '宗主', 副手: '副宗主', 骨干: '长老', 成员: '弟子' },
+}
+
 // ─── 地点 ────────────────────────────────────────────────
-/** 地点类型（含地图渲染所需的「宗门势力」，此前提示词漏列） */
-export const LOCATION_TYPES = ['名山大川', '宗门势力', '城镇坊市', '洞天福地', '奇珍异地', '凶险之地', '其他特殊'] as const
+/**
+ * 地点类型（仙凡融合的现代地球用词）。
+ * ⚠️这组值是**渲染契约**：gameMapManager 的配色与图形、WorldMapPage 的图例、
+ * i18n 文案都按这些字面值匹配，改动必须六处同步，否则地图会掉色。
+ * 顺序对应英文 key：natural_landmark/sect_power/city_town/blessed_land/treasure_land/dangerous_area/special_other
+ */
+export const LOCATION_TYPES = ['山川湖海', '势力据点', '城镇都市', '灵脉宝地', '异变区域', '凶险之地', '其他特殊'] as const
 /** 地点安全等级（types/game.d.ts 定义，此前未在提示词中给出可选值） */
 export const SAFETY_LEVELS = ['安全', '较安全', '危险', '极危险'] as const
 
@@ -100,7 +137,7 @@ export const EFFECT_TYPES = ['buff', 'debuff'] as const
 
 // ─── 消息/事件 ───────────────────────────────────────────
 /** 世界事件类型 */
-export const EVENT_TYPES = ['宗门变动', '世界变革', '异宝降世', '秘境现世', '人物风波'] as const
+export const EVENT_TYPES = ['势力变动', '世界变革', '异宝降世', '秘境现世', '人物风波'] as const
 /** 事件影响等级 */
 export const EVENT_IMPACT_LEVELS = ['轻微', '中等', '重大', '灾难'] as const
 /** 事件来源 */
@@ -202,8 +239,12 @@ export function renderValueDomainsPrompt(): string {
  写成百分比如"灵气15%";❌禁止精力/体力/能量等其他名目
 
 [势力]类型:${FACTION_TYPES.join('|')};等级:${FACTION_LEVELS.join('|')};与玩家关系:${FACTION_RELATIONS.join('|')}
+ 开局可生成(新兴):${FACTION_TYPES_INITIAL.join('|')}
+ 须游戏中复苏(古老道统沉睡未醒,不可开局登场):${FACTION_TYPES_LATENT.join('|')}
+ 职位按类型区分(不要把宗主/长老套到财团):
+${Object.entries(FACTION_RANKS).map(([t, r]) => `  ${t}: 首领=${r.首领}|副手=${r.副手}|骨干=${r.骨干}|成员=${r.成员}`).join('\n')}
 
-[地点]类型:${LOCATION_TYPES.join('|')}(「宗门势力」用于地图上直接标注的宗门/势力所在地)
+[地点]类型:${LOCATION_TYPES.join('|')}(「势力据点」用于地图上直接标注的势力所在地)
  安全等级:${SAFETY_LEVELS.join('|')}
 
 [状态效果]类型只能是:${EFFECT_TYPES.join('|')}(小写);强度为数字

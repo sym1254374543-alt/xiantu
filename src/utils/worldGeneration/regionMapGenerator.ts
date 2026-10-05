@@ -61,10 +61,10 @@ const DEFAULT_PROMPT_TEMPLATE = `你是一个修仙世界的地图设计师。�
 
 【建筑类型】
 - entrance: 区域入口/大门，玩家进入时的默认落点（至少 1 个，isEntrance:true）
-- main: 核心建筑（宗主殿、议事厅、神殿等）
-- residential: 居所（弟子宿舍、客栈、民居等）
-- functional: 功能建筑（藏经阁、炼丹房、坊市、擂台等）
-- restricted: 禁区（禁地、秘库、祖地等）
+- main: 核心建筑（主楼、会议厅、大殿等）
+- residential: 居所（宿舍、公寓、民居等）
+- functional: 功能建筑（研究室、档案库、实验室、食堂、训练场等）
+- restricted: 禁区（禁区、机密库、机要室等）
 - wilderness: 自然地形（山峰、湖泊、广场、道路等）
 
 【数量参考】
@@ -78,7 +78,7 @@ const DEFAULT_PROMPT_TEMPLATE = `你是一个修仙世界的地图设计师。�
 - 每个格子最多一个建筑，任意两个建筑的 (gridX, gridY) 不能相同
 - id 全局唯一，只用英文字母、数字和下划线
 - 至少一个 isEntrance:true 的建筑，一般放在边缘格子
-- 建筑名称贴合地点性质与世界观（宗门有山门、大殿、藏经阁；城镇有城门、坊市、客栈……）
+- 建筑名称贴合地点性质与世界观（机构有大门、主楼、研究室、档案库；城市有街区、商场、车站……）
 
 【严格输出】只输出一个 JSON 对象，不要代码块或解释文字：
 {"buildings":[{"id":"main_hall","name":"建筑名称","gridX":数字,"gridY":数字,"type":"entrance|main|residential|functional|restricted|wilderness","isEntrance":true或false,"description":"一句话描述"}]}`;

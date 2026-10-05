@@ -28,7 +28,7 @@ NPC遇到仇敌:主动攻击/回避/找帮手;NPC遇到道侣:优先保护/共�
 
 export const NPC_RELATION_COMMANDS = `
 [关系网络指令]
-添加关系:{"action":"push","key":"社交.关系矩阵.edges","value":{"from":"张三","to":"李四","relation":"师徒","score":80,"type":"单向","tags":["青云门"],"events":["拜师仪式"],"updatedAt":{"年":x,"月":x,"日":x}}}
+添加关系:{"action":"push","key":"社交.关系矩阵.edges","value":{"from":"陈默","to":"林晚舟","relation":"师徒","score":80,"type":"单向","tags":["天枢研究所"],"events":["拜师仪式"],"updatedAt":{"年":x,"月":x,"日":x}}}
 更新关系:{"action":"set","key":"社交.关系矩阵.edges[索引].score","value":60}
 查询关系:读取社交.关系矩阵.edges,筛选from或to匹配的边
 删除关系:{"action":"delete","key":"社交.关系矩阵.edges[索引]"}

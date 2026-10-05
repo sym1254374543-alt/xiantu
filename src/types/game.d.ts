@@ -802,12 +802,11 @@ export interface EconomyState extends AIMetadata {
 
 /** 事件类型（可扩展） */
 export type EventType =
-  | '宗门变动'
+  | '势力变动'
   | '世界变革'
   | '异宝降世'
   | '秘境现世'
   | '人物风波'
-  | '势力变动'
   | '天灾人祸'
   | string;
 
@@ -843,12 +842,11 @@ export interface EventSystemConfig {
   事件提示词: string;
   // 事件类型开关
   启用事件类型?: {
-    宗门变动?: boolean;
+    势力变动?: boolean;
     世界变革?: boolean;
     异宝降世?: boolean;
     秘境现世?: boolean;
     人物风波?: boolean;
-    势力变动?: boolean;
     天灾人祸?: boolean;
     特殊NPC?: boolean;
   };

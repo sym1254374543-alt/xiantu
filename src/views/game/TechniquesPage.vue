@@ -112,7 +112,7 @@
     <!-- 功法库 -->
     <ListDetail v-else class="tech-body" :open="!!selectedBook && detailOpen" detail-label="功法详情" @close="detailOpen = false">
       <template #list>
-        <EmptyState v-if="!books.length" glyph="法" title="囊中没有功法" desc="奇遇、宗门藏经阁或坊市里都可能得到功法" />
+        <EmptyState v-if="!books.length" glyph="法" title="囊中没有功法" desc="奇遇、传承遗迹或黑市里都可能得到功法" />
         <EmptyState v-else-if="!filteredBooks.length" glyph="寻" title="没有符合的功法" compact>
           <button type="button" class="cc-btn small" @click="query = ''">清除搜索</button>
         </EmptyState>

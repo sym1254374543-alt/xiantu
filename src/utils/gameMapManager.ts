@@ -50,7 +50,7 @@ const PALETTES: Record<'dark' | 'light', MapPalette> = {
     playerRing: 0xd4b878,
     playerText: '#f2d27a',
     types: {
-      名山大川: 0x5fbfa9, 宗门势力: 0xd4b878, 城镇坊市: 0x7f9cf0, 洞天福地: 0xa891f2, 奇珍异地: 0xf0a35a, 凶险之地: 0xe0685a, 其他特殊: 0xf2c46b,
+      山川湖海: 0x5fbfa9, 势力据点: 0xd4b878, 城镇都市: 0x7f9cf0, 灵脉宝地: 0xa891f2, 异变区域: 0xf0a35a, 凶险之地: 0xe0685a, 其他特殊: 0xf2c46b,
     },
   },
   light: {
@@ -71,14 +71,14 @@ const PALETTES: Record<'dark' | 'light', MapPalette> = {
     playerRing: 0x7f5d27,
     playerText: '#8a3a12',
     types: {
-      名山大川: 0x2f7d6f, 宗门势力: 0x7f5d27, 城镇坊市: 0x2c4a86, 洞天福地: 0x5b3fa0, 奇珍异地: 0xa3500f, 凶险之地: 0xb8322a, 其他特殊: 0x9a5b00,
+      山川湖海: 0x2f7d6f, 势力据点: 0x7f5d27, 城镇都市: 0x2c4a86, 灵脉宝地: 0x5b3fa0, 异变区域: 0xa3500f, 凶险之地: 0xb8322a, 其他特殊: 0x9a5b00,
     },
   },
 };
 
 const TYPE_ALIAS: Record<string, string> = {
-  natural_landmark: '名山大川', sect_power: '宗门势力', city_town: '城镇坊市', blessed_land: '洞天福地',
-  treasure_land: '奇珍异地', dangerous_area: '凶险之地', special_other: '其他特殊',
+  natural_landmark: '山川湖海', sect_power: '势力据点', city_town: '城镇都市', blessed_land: '灵脉宝地',
+  treasure_land: '异变区域', dangerous_area: '凶险之地', special_other: '其他特殊',
 };
 
 const hexNum = (c: string | undefined, fallback: number) => {
@@ -849,7 +849,7 @@ export class GameMapManager {
     };
 
     switch (TYPE_ALIAS[type] || type) {
-      case '名山大川':
+      case '山川湖海':
         shape(() => {
           g.moveTo(-18, 14);
           g.lineTo(-6, -8);
@@ -865,7 +865,7 @@ export class GameMapManager {
         g.closePath();
         g.endFill();
         break;
-      case '宗门势力':
+      case '势力据点':
         shape(() => g.drawRoundedRect(-17, -12, 34, 28, 3));
         g.beginFill(color, 0.95);
         g.moveTo(-22, -12);
@@ -877,7 +877,7 @@ export class GameMapManager {
         g.drawRect(-5, 2, 10, 14);
         g.endFill();
         break;
-      case '城镇坊市':
+      case '城镇都市':
         shape(() => g.drawCircle(0, 0, 19));
         g.lineStyle(3, P.inner, 0.9);
         g.drawCircle(0, 0, 9);
@@ -885,7 +885,7 @@ export class GameMapManager {
         g.lineTo(19, 0);
         g.lineStyle(0);
         break;
-      case '洞天福地': {
+      case '灵脉宝地': {
         shape(() => g.drawCircle(0, 0, 19));
         g.beginFill(P.inner, 0.95);
         for (let i = 0; i < 10; i++) {
@@ -898,7 +898,7 @@ export class GameMapManager {
         g.endFill();
         break;
       }
-      case '奇珍异地':
+      case '异变区域':
         shape(() => {
           g.moveTo(0, -21);
           g.lineTo(17, 0);
@@ -946,7 +946,7 @@ export class GameMapManager {
     if (!territoryLayer) return;
 
     const bounds = location.territoryBounds;
-    const color = themeReadable(hexNum(location.color, this.palette.types.宗门势力), this.palette.bg < 0x808080);
+    const color = themeReadable(hexNum(location.color, this.palette.types.势力据点), this.palette.bg < 0x808080);
     const trace = (g: PIXI.Graphics) => {
       g.moveTo(bounds[0].x, bounds[0].y);
       for (let i = 1; i < bounds.length; i++) g.lineTo(bounds[i].x, bounds[i].y);
