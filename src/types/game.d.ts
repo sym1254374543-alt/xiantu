@@ -305,8 +305,8 @@ export interface SkillInfo {
 
 // --- 宗门系统相关类型 ---
 
-/** 宗门类型 */
-export type SectType = '正道宗门' | '魔道宗门' | '中立宗门' | '商会' | '世家' | '散修联盟';
+/** 宗门类型（与 valueDomains 的 FACTION_TYPES 对应：修仙宗门=正道宗门、修仙世家=世家、商会组织=商会） */
+export type SectType = '正道宗门' | '魔道宗门' | '中立宗门' | '商会' | '世家' | '散修联盟' | '妖族' | '其他';
 
 /** 宗门职位 */
 export type SectPosition =

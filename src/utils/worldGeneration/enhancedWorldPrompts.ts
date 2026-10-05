@@ -134,7 +134,8 @@ ${buildWorldSettingLines(config)}
 - 人名：具体中式姓名（2-3字或复姓），全局唯一
 
 ## 地点（${finalLocationCount}个）
-- 类型只能是：名山大川 / 城镇坊市 / 洞天福地 / 奇珍异地 / 凶险之地 / 其他特殊
+- 类型取[值域规范]的地点类型；本模式用：名山大川 / 城镇坊市 / 洞天福地 / 奇珍异地 / 凶险之地 / 其他特殊
+  （「宗门势力」留给地图上直接标注的宗门所在地，由势力生成时产出）
 - 数量分布：名山大川${naturalLandmarks} | 城镇坊市${cities} | 洞天福地+奇珍异地共${specialSites} | 凶险之地${dangerZones} | 其他特殊${otherSites}
 - 其中 ${finalSecretRealmCount} 个带特殊属性（写进"特色"数组）：机遇之地${opportunityRealms} | 传承遗迹${heritageRealms} | 危险禁地${dangerousRealms}
 - 坐标落在所属大洲边界内，彼此不重叠；每个大洲都要有地点

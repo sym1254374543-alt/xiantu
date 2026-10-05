@@ -69,6 +69,43 @@ export const TALENT_EFFECT_TYPES = ['后天六司', '技能加成', '特殊能�
 /** 「技能加成」可用的技能名 → 对应判定类型（见 utils/abilityBonus.ts） */
 export const TALENT_SKILLS = ['剑法', '刀法', '拳法', '毒术', '炼丹', '炼器', '符箓', '阵法', '医术'] as const
 
+// ─── 物品类型 ────────────────────────────────────────────
+/** 背包物品类型（与 types/game.d.ts 的 ItemType 一致） */
+export const ITEM_TYPES = ['装备', '功法', '丹药', '材料', '其他'] as const
+
+// ─── 技能消耗 ────────────────────────────────────────────
+/** 技能/法术只能消耗的资源名目（禁止 精力/体力/能量 等） */
+export const SKILL_RESOURCES = ['灵气', '神识', '气血', '寿元'] as const
+
+// ─── 势力 ────────────────────────────────────────────────
+/**
+ * 世界势力类型（AI 生成与档案存储统一用这一套）。
+ * 此前存在三套互不兼容的写法（SectType / WorldFaction.类型 / 生成提示词），已统一。
+ */
+export const FACTION_TYPES = ['修仙宗门', '魔道宗门', '中立宗门', '修仙世家', '魔道势力', '商会组织', '散修联盟', '妖族'] as const
+/** 势力等级 */
+export const FACTION_LEVELS = ['超级', '一流', '二流', '三流'] as const
+/** 势力与玩家关系 */
+export const FACTION_RELATIONS = ['敌对', '中立', '友好'] as const
+
+// ─── 地点 ────────────────────────────────────────────────
+/** 地点类型（含地图渲染所需的「宗门势力」，此前提示词漏列） */
+export const LOCATION_TYPES = ['名山大川', '宗门势力', '城镇坊市', '洞天福地', '奇珍异地', '凶险之地', '其他特殊'] as const
+/** 地点安全等级（types/game.d.ts 定义，此前未在提示词中给出可选值） */
+export const SAFETY_LEVELS = ['安全', '较安全', '危险', '极危险'] as const
+
+// ─── 状态效果 ────────────────────────────────────────────
+/** 状态效果类型（buff/debuff 用小写，见 utils/judgement.ts 的 effectSign） */
+export const EFFECT_TYPES = ['buff', 'debuff'] as const
+
+// ─── 消息/事件 ───────────────────────────────────────────
+/** 世界事件类型 */
+export const EVENT_TYPES = ['宗门变动', '世界变革', '异宝降世', '秘境现世', '人物风波'] as const
+/** 事件影响等级 */
+export const EVENT_IMPACT_LEVELS = ['轻微', '中等', '重大', '灾难'] as const
+/** 事件来源 */
+export const EVENT_SOURCES = ['随机', '玩家影响', '系统'] as const
+
 // ─── 功法 ────────────────────────────────────────────────
 /** 功法装备标记写在哪（AI 漏写会导致功法不加成战力） */
 export const TECHNIQUE_EQUIP_PATH = '背包.物品.{功法ID}.已装备 = true'
@@ -147,5 +184,19 @@ export function renderValueDomainsPrompt(): string {
  ${TECHNIQUE_MAIN_PATH}
  ${TECHNIQUE_PROGRESS_PATH}
  非主修功法放背包内 已装备=false 即可;一个角色只 equip 一本主修
+
+[物品类型]只能是:${ITEM_TYPES.join('|')}
+
+[技能消耗]资源名只能是:${SKILL_RESOURCES.map(r => r === '寿元' ? '寿元(禁术,写"寿元5年")' : r).join('|')}
+ 写成百分比如"灵气15%";❌禁止精力/体力/能量等其他名目
+
+[势力]类型:${FACTION_TYPES.join('|')};等级:${FACTION_LEVELS.join('|')};与玩家关系:${FACTION_RELATIONS.join('|')}
+
+[地点]类型:${LOCATION_TYPES.join('|')}(「宗门势力」用于地图上直接标注的宗门/势力所在地)
+ 安全等级:${SAFETY_LEVELS.join('|')}
+
+[状态效果]类型只能是:${EFFECT_TYPES.join('|')}(小写);强度为数字
+
+[世界事件]类型:${EVENT_TYPES.join('|')};影响等级:${EVENT_IMPACT_LEVELS.join('|')};来源:${EVENT_SOURCES.join('|')}
 `.trim()
 }

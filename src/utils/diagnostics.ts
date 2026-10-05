@@ -25,22 +25,29 @@ class DiagnosticsStore {
   private listeners = new Set<() => void>()
   private seq = 0
 
-  /** 记录一条诊断 */
+  /**
+   * 记录一条诊断。
+   * 同一条(scope+message+detail)只保留一条：判定/守卫每回合都会跑，
+   * 存档里的同一处问题会被反复检出，不去重会刷屏。
+   */
   push(item: DiagnosticItem): void {
+    const key = (d: DiagnosticItem) => `${d.scope}|${d.message}|${d.detail ?? ''}`
+    const k = key(item)
+    const idx = this.items.findIndex((d) => key(d) === k)
+    if (idx >= 0) {
+      // 已存在：只更新时间戳，不重复堆积
+      this.items[idx] = { ...this.items[idx], at: item.at ?? Date.now() }
+      return
+    }
     this.items.push({ ...item, at: item.at ?? Date.now() })
     this.seq++
     if (this.items.length > MAX_ITEMS) this.items = this.items.slice(-MAX_ITEMS)
     this.emit()
   }
 
-  /** 批量记录 */
+  /** 批量记录（逐条走 push，享有同样的去重） */
   pushAll(items: DiagnosticItem[]): void {
-    if (!items.length) return
-    const now = Date.now()
-    for (const it of items) this.items.push({ ...it, at: it.at ?? now })
-    this.seq++
-    if (this.items.length > MAX_ITEMS) this.items = this.items.slice(-MAX_ITEMS)
-    this.emit()
+    for (const it of items) this.push(it)
   }
 
   /** 清空 */

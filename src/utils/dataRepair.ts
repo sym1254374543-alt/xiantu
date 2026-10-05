@@ -16,7 +16,7 @@ import { cloneDeep } from 'lodash';
 import { isSaveDataV3, migrateSaveDataToLatest } from '@/utils/saveMigration';
 import { validateSaveDataV3 } from '@/utils/saveValidationV3';
 import { normalizeBackpackCurrencies } from '@/utils/currencySystem';
-import { guardSpiritRootTier } from '@/utils/valueGuard';
+import { guardEntityDomains } from '@/utils/valueGuard';
 
 /**
  * 修复并清洗存档数据，确保所有必需字段存在且格式正确
@@ -73,8 +73,9 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
       repaired.角色.身份.后天六司 = { 根骨: 0, 灵性: 0, 悟性: 0, 气运: 0, 魅力: 0, 心性: 0 };
     }
 
-    // 修复玩家灵根品阶（同 NPC：把误用的物品品质改回规范值）
-    repairSpiritRootTier(repaired.角色.身份 as any);
+    // 值域守卫：灵根品阶纠正 + 物品品质/品级校验 + 大道阶段校验
+    // （不纠正的项写入诊断，手机端可在设置→运行诊断查看）
+    guardEntityDomains(repaired, '玩家');
 
     // --- 属性 ---
     if (!repaired.角色.属性 || typeof repaired.角色.属性 !== 'object') {
@@ -500,22 +501,6 @@ function repairItem(item: Item): Item {
 }
 
 /**
- * 修复灵根品阶：把误用的物品品质改回灵根规范值域。
- * 值域与映射统一由 utils/valueGuard.ts 提供（唯一来源），此处仅做委托，
- * 避免两处各维护一份映射造成不一致。
- * @returns 是否发生了修复
- */
-export function repairSpiritRootTier(holder: any): boolean {
-  const before = holder?.灵根 && (holder.灵根.品级 ?? holder.灵根.tier)
-  const changed = guardSpiritRootTier(holder)
-  const after = holder?.灵根 && (holder.灵根.品级 ?? holder.灵根.tier)
-  if (changed && before !== after) {
-    console.log(`[数据修复] 灵根品阶纠正: 「${before}」→「${after}」(${holder.灵根?.名称 || holder.灵根?.name || ''})`)
-  }
-  return changed
-}
-
-/**
  * 修复NPC数据
  */
 function repairNpc(npc: NpcProfile): NpcProfile {
@@ -525,8 +510,8 @@ function repairNpc(npc: NpcProfile): NpcProfile {
   repaired.名字 = repaired.名字 || '无名';
   repaired.性别 = repaired.性别 || '男';
 
-  // 修复灵根品阶（AI 误把物品品质当灵根品阶时改回规范值）
-  repairSpiritRootTier(repaired as any);
+  // 值域守卫：灵根品阶纠正 + 背包物品品质/品级校验（不纠正的项写入诊断）
+  guardEntityDomains(repaired as any, `${repaired.名字} `);
 
   // 年龄已自动从出生日期计算,删除年龄字段
 

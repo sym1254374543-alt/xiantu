@@ -40,13 +40,21 @@ export interface SectFrameworkResult {
   contentStatus: SectContentStatus;
 }
 
+/**
+ * 势力类型归一化：把 AI 可能的多种写法收敛到统一的 SectType。
+ * 注意顺序：先判具体门类，再兜底。此前漏了「妖族」，会被误判成正道宗门
+ * （而世界生成有"妖族5-10%"的比例要求，等于每次生成妖族势力都出错）。
+ */
 const normalizeSectType = (typeText: string): SectType => {
-  if (/魔道|魔/i.test(typeText)) return '魔道宗门';
-  if (/散修联盟|散修|联盟/i.test(typeText)) return '散修联盟';
-  if (/中立/i.test(typeText)) return '中立宗门';
-  if (/世家|门阀|家族/i.test(typeText)) return '世家';
-  if (/商会|商盟|商号/i.test(typeText)) return '商会';
-  return '正道宗门';
+  const t = String(typeText || '');
+  if (/妖族|兽族|万兽/i.test(t)) return '妖族';
+  if (/魔道|魔/i.test(t)) return '魔道宗门';
+  if (/散修联盟|散修|联盟/i.test(t)) return '散修联盟';
+  if (/中立/i.test(t)) return '中立宗门';
+  if (/世家|门阀|家族/i.test(t)) return '世家';
+  if (/商会|商盟|商号/i.test(t)) return '商会';
+  if (/宗门|门派|佛门|道门/i.test(t)) return '正道宗门';
+  return '其他';
 };
 
 const hashString = (input: string) => {
