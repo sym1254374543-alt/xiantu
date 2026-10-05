@@ -7,12 +7,17 @@ import { computed } from 'vue';
 import { cloneDeep } from 'lodash';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { useCharacterStore } from '@/stores/characterStore';
-import { DEFAULT_BASE_CURRENCY_ID, DEFAULT_CURRENCIES, normalizeInventoryCurrencies, syncWalletToLegacySpiritStones } from '@/utils/currencySystem';
+import { DEFAULT_BASE_CURRENCY_ID, DEFAULT_CURRENCIES, currencySystemOf, normalizeInventoryCurrencies, syncWalletToLegacySpiritStones } from '@/utils/currencySystem';
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const num = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
-/** 相邻面额：兑换 = 往上换，分解 = 往下拆，基准比 100，手续费 2% */
+/**
+ * 相邻面额：兑换 = 往上换，分解 = 往下拆，手续费 2%。
+ * 兑换只在**同一体系内**进行（灵石⇄灵石、法币⇄法币、凡俗⇄凡俗），
+ * 体系之间互不兑换——灵气复苏的地球上，凡人根本不知灵石为何物。
+ * 面额比不再写死 100，改由价值度推导，这样法币（人民币⇄美元 7.2）也能用。
+ */
 const LADDER: Record<string, { up?: string; down?: string }> = {
   灵石_下品: { up: '灵石_中品' },
   灵石_中品: { up: '灵石_上品', down: '灵石_下品' },
@@ -21,10 +26,17 @@ const LADDER: Record<string, { up?: string; down?: string }> = {
   铜币: { up: '银两' },
   银两: { up: '金锭', down: '铜币' },
   金锭: { down: '银两' },
+  // 法币体系
+  人民币: { up: '美元' },
+  美元: { up: '欧元', down: '人民币' },
+  欧元: { down: '美元' },
 };
-const ORDER = ['灵石_下品', '灵石_中品', '灵石_上品', '灵石_极品', '铜币', '银两', '金锭'];
+const ORDER = [
+  '灵石_下品', '灵石_中品', '灵石_上品', '灵石_极品',
+  '人民币', '美元', '欧元',
+  '铜币', '银两', '金锭',
+];
 const FEE = 0.02;
-const RATIO = 100;
 
 export interface CurrencyRow {
   id: string;
@@ -78,10 +90,24 @@ export function useWallet() {
 
   const valueDegreeOf = (id: string) => num(wallet.value[id]?.价值度, num((DEFAULT_CURRENCIES as any)[id]?.价值度, 0));
 
+  /**
+   * 折算为「本体系内的基准单位」（不跨体系）。
+   * 灵石体系基准=下品灵石；法币体系基准=人民币；凡俗体系基准=铜币。
+   * 原先用全局基准币种折算，会把「1 元」和「1 下品灵石」算术相加，
+   * 违反「灵石与钱不互通」的设定。
+   */
+  const systemBaseOf = (id: string): string => {
+    const sys = currencySystemOf(id)
+    if (sys === '灵石') return '灵石_下品'
+    if (sys === '法币') return '人民币'
+    return '铜币'
+  }
+
   const toBase = (id: string, amount: number) => {
-    const denom = (valueDegreeOf(baseId.value) || 1) * multiplierOf(baseId.value) || 1;
-    return (amount * valueDegreeOf(id) * multiplierOf(id)) / denom;
-  };
+    const base = systemBaseOf(id)
+    const denom = (valueDegreeOf(base) || 1) * multiplierOf(base) || 1
+    return (amount * valueDegreeOf(id) * multiplierOf(id)) / denom
+  }
 
   const rows = computed<CurrencyRow[]>(() => {
     const ids = Object.keys(wallet.value);
@@ -89,6 +115,7 @@ export function useWallet() {
     return [...ORDER.filter((id) => ids.includes(id)), ...extra].map((id) => {
       const asset = wallet.value[id] || {};
       const amount = num(asset.数量);
+      const sys = currencySystemOf(id);
       const row: CurrencyRow = {
         id,
         name: nameOf(id),
@@ -96,23 +123,43 @@ export function useWallet() {
         desc: String(asset.描述 || ''),
         valueDegree: valueDegreeOf(id),
         baseValue: toBase(id, amount),
-        tier: ORDER.indexOf(id) >= 0 && id.startsWith('灵石_') ? ORDER.indexOf(id) : -1,
+        tier: ORDER.indexOf(id) >= 0 && sys === '灵石' ? ORDER.indexOf(id) : -1,
       };
       const pair = LADDER[id];
       const fromMult = multiplierOf(id);
       if (pair?.up) {
-        const ratio = multiplierOf(pair.up) / fromMult;
-        row.up = { to: pair.up, toName: nameOf(pair.up), cost: Math.max(1, Math.ceil(RATIO * ratio * (1 + FEE))) };
+        // 面额比由价值度推导：中品/下品=100，美元/人民币=7.2
+        const degRatio = (valueDegreeOf(pair.up) || 1) / (valueDegreeOf(id) || 1);
+        const multRatio = multiplierOf(pair.up) / fromMult;
+        row.up = {
+          to: pair.up, toName: nameOf(pair.up),
+          cost: Math.max(1, Math.ceil(degRatio * multRatio * (1 + FEE))),
+        };
       }
       if (pair?.down) {
-        const ratio = multiplierOf(pair.down) / fromMult;
-        row.down = { to: pair.down, toName: nameOf(pair.down), yield: Math.max(1, Math.floor((RATIO / ratio) * (1 - FEE))) };
+        const degRatio = (valueDegreeOf(pair.down) || 1) / (valueDegreeOf(id) || 1);
+        const multRatio = multiplierOf(pair.down) / fromMult;
+        row.down = {
+          to: pair.down, toName: nameOf(pair.down),
+          yield: Math.max(1, Math.floor((1 / (degRatio * multRatio)) * (1 - FEE))),
+        };
       }
       return row;
     });
   });
 
-  const totalInBase = computed(() => rows.value.reduce((s, r) => s + r.baseValue, 0));
+  /** 各体系折算值（互不相加） */
+  const totalsBySystem = computed(() => {
+    const out: Record<string, number> = {}
+    for (const r of rows.value) {
+      const sys = currencySystemOf(r.id)
+      out[sys] = (out[sys] || 0) + r.baseValue
+    }
+    return out
+  });
+
+  /** 基准币种所在体系的总值（不再跨体系求和） */
+  const totalInBase = computed(() => totalsBySystem.value[currencySystemOf(baseId.value)] || 0);
 
   const market = computed(() => {
     const m = multiplierOf(DEFAULT_BASE_CURRENCY_ID);
@@ -206,5 +253,5 @@ export function useWallet() {
     });
   };
 
-  return { rows, totalInBase, baseId, baseName, market, exchangeUp, exchangeDown, removeCurrency };
+  return { rows, totalInBase, totalsBySystem, baseId, baseName, market, exchangeUp, exchangeDown, removeCurrency };
 }

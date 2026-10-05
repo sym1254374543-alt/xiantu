@@ -112,6 +112,18 @@ export const TECHNIQUE_EQUIP_PATH = '背包.物品.{功法ID}.已装备 = true'
 export const TECHNIQUE_MAIN_PATH = '功法.功法套装.主修 = {功法ID}'
 export const TECHNIQUE_PROGRESS_PATH = '功法.功法进度.{功法ID}.熟练度 = 0-100'
 
+// ─── 货币 ────────────────────────────────────────────────
+/**
+ * 货币体系：三套体系**互不兑换**（凡人不知灵石为何物）。
+ * 价值度只在**体系内部**相对（灵石内 下品=1；法币内 人民币=1），
+ * 不要给出任何跨体系汇率。
+ */
+export const CURRENCY_SYSTEMS: { 体系: string; 币种: string[]; 基准: string }[] = [
+  { 体系: '灵石', 币种: ['下品灵石', '中品灵石', '上品灵石', '极品灵石'], 基准: '下品灵石=1' },
+  { 体系: '法币', 币种: ['人民币', '美元', '欧元'], 基准: '人民币=1|美元≈7.2|欧元≈7.8' },
+  { 体系: '凡俗', 币种: ['铜币', '银两', '金锭'], 基准: '铜币|银两|金锭' },
+]
+
 /** 灵根品级是否为合法值 */
 export function isValidSpiritRootTier(tier: unknown): boolean {
   return typeof tier === 'string' && (SPIRIT_ROOT_ALL_TIERS as readonly string[]).includes(tier.trim())
@@ -198,5 +210,9 @@ export function renderValueDomainsPrompt(): string {
 [状态效果]类型只能是:${EFFECT_TYPES.join('|')}(小写);强度为数字
 
 [世界事件]类型:${EVENT_TYPES.join('|')};影响等级:${EVENT_IMPACT_LEVELS.join('|')};来源:${EVENT_SOURCES.join('|')}
+
+[货币]⚠️三套体系互不兑换,禁止给出跨体系汇率:
+${CURRENCY_SYSTEMS.map(s => ` ${s.体系}:${s.币种.join('/')}(${s.基准})`).join('\n')}
+ 凡人不知灵石为何物;修士也极少用法币交易。两套体系各标各价,不要换算。
 `.trim()
 }

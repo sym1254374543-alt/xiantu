@@ -2,6 +2,28 @@ import type { CurrencyAsset, CurrencySettings, Inventory } from '@/types/game';
 
 export const DEFAULT_BASE_CURRENCY_ID = '灵石_下品';
 
+/**
+ * 货币体系：不同体系之间**互不兑换**（灵气复苏的地球上，凡人根本不知灵石为何物）。
+ * - 灵石：修士之间流通
+ * - 法币：现代社会通用（人民币/美元/欧元）
+ * - 凡俗：旧时代金银铜（保留兼容）
+ */
+export type CurrencySystem = '灵石' | '法币' | '凡俗';
+
+/** 各币种所属体系；未列出的按 id 前缀推断 */
+export const CURRENCY_SYSTEM: Record<string, CurrencySystem> = {
+  灵石_下品: '灵石', 灵石_中品: '灵石', 灵石_上品: '灵石', 灵石_极品: '灵石',
+  人民币: '法币', 美元: '法币', 欧元: '法币',
+  铜币: '凡俗', 银两: '凡俗', 金锭: '凡俗',
+};
+
+/** 取币种所属体系（供钱包分组与「不跨体系求和」用） */
+export function currencySystemOf(id: string): CurrencySystem {
+  if (CURRENCY_SYSTEM[id]) return CURRENCY_SYSTEM[id];
+  if (id.startsWith('灵石')) return '灵石';
+  return '凡俗';
+}
+
 export type DefaultCurrencyId =
   | '灵石_下品'
   | '灵石_中品'
@@ -9,7 +31,10 @@ export type DefaultCurrencyId =
   | '灵石_极品'
   | '铜币'
   | '银两'
-  | '金锭';
+  | '金锭'
+  | '人民币'
+  | '美元'
+  | '欧元';
 
 export const DEFAULT_CURRENCIES: Record<DefaultCurrencyId, Omit<CurrencyAsset, '数量'>> = {
   灵石_下品: { 币种: '灵石_下品', 名称: '下品灵石', 价值度: 1, 描述: '修士通用货币（基准单位）', 图标: 'Gem' },
@@ -19,6 +44,10 @@ export const DEFAULT_CURRENCIES: Record<DefaultCurrencyId, Omit<CurrencyAsset, '
   铜币: { 币种: '铜币', 名称: '铜币', 价值度: 0.00001, 描述: '凡俗常用小额货币', 图标: 'Coins' },
   银两: { 币种: '银两', 名称: '银两', 价值度: 0.001, 描述: '凡俗常用中额货币（约等于 100 铜币）', 图标: 'HandCoins' },
   金锭: { 币种: '金锭', 名称: '金锭', 价值度: 0.1, 描述: '凡俗常用大额货币（约等于 100 银两）', 图标: 'BadgeDollarSign' },
+  // ─── 现代法币（灵气复苏的地球）：价值度只在法币体系内相对，不与灵石换算 ───
+  人民币: { 币种: '人民币', 名称: '人民币', 价值度: 1, 描述: '现代法币基准单位（¥）', 图标: 'Banknote' },
+  美元: { 币种: '美元', 名称: '美元', 价值度: 7.2, 描述: '国际结算货币（1 美元 ≈ 7.2 元）', 图标: 'BadgeDollarSign' },
+  欧元: { 币种: '欧元', 名称: '欧元', 价值度: 7.8, 描述: '欧洲通用货币（1 欧元 ≈ 7.8 元）', 图标: 'Euro' },
 };
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number): number {
