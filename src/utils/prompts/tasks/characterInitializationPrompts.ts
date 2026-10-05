@@ -26,7 +26,7 @@ export const CHARACTER_INIT_TASK_PROMPT = `
 3. 5 个行动选项（action_options）
 
 ## 输出格式（最高优先级）
-只输出一个 JSON 对象，不要代码块、解释文字或 <thinking> 等标签。结构如下（数值须按角色实际情况填写，下面只是格式示意）：
+只输出一个 JSON 对象，不要代码块、解释文字或 <thinking> 等标签。结构如下（数值须按角色实际情况填写，下面只是格式示意，不代表玩家一定出生在村落或身无长物）：
 {"text":"开局叙事正文","mid_term_memory":"50-100字开局摘要","tavern_commands":[
  {"action":"set","key":"元数据.时间","value":{"年":1050,"月":3,"日":12,"小时":8,"分钟":0}},
  {"action":"set","key":"角色.身份.出生日期","value":{"年":1034,"月":7,"日":2}},
@@ -34,6 +34,7 @@ export const CHARACTER_INIT_TASK_PROMPT = `
  {"action":"set","key":"角色.属性.声望","value":0},
  {"action":"set","key":"角色.背包.货币.灵石_下品","value":{"币种":"灵石_下品","名称":"下品灵石","数量":12,"价值度":1}}
 ],"action_options":["选项1","选项2","选项3","选项4","选项5"]}
+tavern_commands 条数不设上限：剧情需要多少条就写多少条（多部功法、多件物品、多个NPC、多条大道都要逐条写出）
 
 - text：只写故事正文，不夹带游戏数据、JSON 或变量名
 - mid_term_memory：必填，概括开局核心信息
@@ -47,30 +48,43 @@ export const CHARACTER_INIT_TASK_PROMPT = `
    - 描述按[位置更新]：大陆·世界地图地点(·建筑)，优先从「可用地点」中选；宗门/城镇直接作第二层，不挂在山脉等地形下
    - x/y 取 0-10000；灵气浓度 1-100（普通地点20-40，灵地50-70，洞天福地80+）
    - 禁止占位文本："位置生成失败"/"无名之地"/"待生成"/"暂无"/"unknown"/"undefined"/"null"
-3. **声望**：角色.属性.声望（普通出身0-10｜宗门出身10-50｜名门出身50-100）
-4. **初始资金**：角色.背包.货币.灵石_下品（完整对象，见上例）
+3. **声望**：角色.属性.声望——优先按出身背景定；背景未提时，普通出身0-10｜宗门出身10-50｜名门出身50-100
+4. **初始资金**：角色.背包.货币.{币种}.{数量}——严格按出身背景写（背景说"10000颗极品灵石"就写 10000）
+   背景未提及时，才按身份给：平民 10-50 下品｜世家/宗门 100-300 下品；币种用背景中提到的（如"极品灵石"）
 5. **随机项**：灵根/出身为"随机"时，set 角色.身份.灵根 或 角色.身份.出生 为具体内容
 
 ## 视情况设置
 - **NPC**：只为正文中出现、之后还会打交道的重要人物建档（0-3个，路人不建），写入 社交.关系.{NPC名}
   - 完整 NPCData：出生(出身背景，不是年龄)/出生日期/先天六司/外貌描述(50字+)/性格特征(3个+)/天赋/记忆(2条+)/属性等；不输出"年龄"字段
   - 初始好感不宜过高（血亲除外），体现人情冷暖
-- **物品/功法**：正文中确实持有的才写入 角色.背包.物品.{物品ID}
-- **大道**：天赋/出身直接关联某条大道时，写入 角色.大道.大道列表.{道名}
+- **物品**：出身背景与正文中确实持有的才写入 角色.背包.物品.{物品ID}；多个物品逐个 set，不要只写一件
+- **功法**：出身背景中有几部就写几部（多部功法要逐部写入，禁止只写一部）
+  - 每部功法写法：set 角色.背包.物品.{功法ID} = {物品ID,名称,类型:"功法",品质:{quality,grade},修炼进度,功法技能}
+  - 修炼进度按背景的修炼程度给（如"已然大成""臻至化境"应为高分，不是0）
+  - 主修功法再 set 角色.背包.物品.{功法ID}.已装备=true，并 set 角色.功法.当前功法ID 与 角色.功法.功法进度.{功法ID}.熟练度
+- **剑灵/器灵等关系**：背景提到的灵体一律建档到 社交.关系.{名字}，名字严格照背景，不得改名
+- **大道**：出身/背景中提到的大道与境界必须写全
+  - set 角色.大道.大道列表.{道名} = {道名,描述,是否解锁:true,当前阶段,当前经验,总经验,阶段列表}
+  - ⚠️阶段列表固定6项（下标0-5），名称贴合该道意境且各道不同；当前阶段按背景的造诣填（0-5）
+  - 背景说"对某道已臻化境"就该给高阶段，不是0
 
 ## 叙事要求
 - **文风**：以「文风」提示词为准；未指定时保持修仙世界的称谓与规矩
 - **沉浸**：写环境氛围、身体感受与可见动作，不罗列数据；不出现"玩家""获得""装备了""等级提升"等出戏词
 - **成仙之难**：严禁"看一眼就学会""模仿一下就突破""瞬间踏入练气"；天才也只体现在感悟深度上，而非过程廉价
-- **境界严谨**：凡人开局绝不在本次叙事中入道或突破
+- **境界严谨**：开局境界必须与出身背景一致——背景是凡人则本次叙事不入道不突破；背景已是高阶修士则如实呈现其修为，并交代来由（如沉睡千年、传承顿悟）
 - **年龄与出身**：从所选年龄开始，言行符合年龄段（孩童不说老怪的话）；出身决定眼界与起点，必须与角色数据一致
 - **时间感**：适当体现时间流逝（如"寒来暑往""枯坐数日"）
 
-## 初始资源上限（严格执行）
-- **资金**（折算下品灵石）：贫困/流浪 0-10｜普通 10-50｜修仙世家/宗门 100-300｜富裕/商贾 300-800
-- **物品**：1-5件，以凡品为主；禁止开局给予地品及以上（除非出身明确是顶级"天选"类且有剧情铺垫）
-- **功法**：0-2部；多数凡人开局没有功法，需在剧情中获取或入宗后获得
-- **境界**：绝大多数开局为凡人（进度0）；只有修仙世家且年龄较大、或有特殊奇遇背景，才可为练气初期
+## 初始资源与境界：以出身背景为准（最高优先级）
+出身背景效果里写明的功法/资源/关系/境界/感悟，一律如实落实，不受任何上限限制。
+背景未写明时，才按身份合理推断：
+- 凡人平民：无功法、少量凡品物品与钱财、境界凡人（进度0）
+- 世家/宗门子弟：可有黄品~玄品功法、对应资源、境界练气
+- 有奇遇或传承背景：按背景描述给，可高于常规
+
+原则：**忠于背景，不要"平衡"**。背景说他有几本功法就是几本，说他是炼虚就是炼虚，说剑灵叫什么就叫什么。
+不得为迁就"新手开局"而降格；也不得凭空添加背景未提及的高阶资源。
 `.trim();
 
 /** 酒馆端专属：玩家法身数据（网页版整块不发送） */
@@ -148,6 +162,31 @@ export function buildCharacterSelectionsSummary(
   const settings = worldContext?.systemSettings;
   const nsfwScope = settings?.nsfwGenderFilter === 'all' ? '所有NPC' : settings?.nsfwGenderFilter === 'female' ? '仅女性NPC' : '仅男性NPC';
 
+  // 出身背景效果：这是开局最重要的依据，早期遗漏导致 AI 不知道背景里有什么，
+  // 进而丢物品、丢功法、剑灵名字写错、境界不符。此处必须完整透传。
+  const originObj = originIsObj ? (origin as Origin) : null;
+  const originEffects = Array.isArray(originObj?.background_effects)
+    ? originObj!.background_effects!.filter(e => e && (e.type || e.description))
+    : [];
+  // 按类别分组，便于 AI 逐项落实
+  const groupOrder = ['功法', '资源', '关系', '境界', '感悟', '物品', '其他'];
+  const effectsByType = new Map<string, string[]>();
+  for (const e of originEffects) {
+    const key = groupOrder.includes(e.type) ? e.type : '其他';
+    if (!effectsByType.has(key)) effectsByType.set(key, []);
+    effectsByType.get(key)!.push(e.description);
+  }
+  const originEffectsBlock = originEffects.length
+    ? [...effectsByType.entries()]
+        .sort((a, b) => groupOrder.indexOf(a[0]) - groupOrder.indexOf(b[0]))
+        .map(([type, items]) => `### ${type}\n${items.map(i => `- ${i}`).join('\n')}`)
+        .join('\n')
+    : '(无背景效果)';
+
+  const originMods = originObj?.attribute_modifiers && Object.keys(originObj.attribute_modifiers).length
+    ? Object.entries(originObj.attribute_modifiers).map(([k, v]) => `${k}${Number(v) >= 0 ? '+' : ''}${v}`).join(' ')
+    : '';
+
   return `
 # 玩家角色数据
 
@@ -163,6 +202,17 @@ ${talentTier.name}: ${talentTier.description}
 
 ## 出身
 ${originIsObj ? (origin as Origin).name : origin}: ${originIsObj ? (origin as Origin).description : '(随机，需AI生成)'}
+${originMods ? `\n### 出身属性修正\n${originMods}` : ''}
+
+### ⚠️ 出身背景效果（必须逐项落实为开局数据）
+${originEffectsBlock}
+以上每一条都是角色的既有经历与持有物，不是可选设定：
+- 【功法】有几部就写几部，并按描述给出匹配的品质与已修进度
+- 【资源】逐个写进背包（物品/货币），数量与描述一致
+- 【关系】逐个建立 NPC 档案，姓名、身份、境界严格照描述写
+- 【境界】按描述设置 角色.属性.境界（不是凡人开局）
+- 【感悟】转成对应的大道与阶段
+禁止遗漏、禁止改名、禁止降格；与下文"初始资源上限"冲突时，以本节为准
 
 ## 灵根
 ${spiritRootIsObj ? `${(spiritRoot as SpiritRoot).name} (${(spiritRoot as SpiritRoot).tier})` : spiritRoot}: ${spiritRootIsObj ? (spiritRoot as SpiritRoot).description : '(随机，需AI生成)'}
