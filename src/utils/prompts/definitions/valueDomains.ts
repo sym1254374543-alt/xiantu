@@ -1,0 +1,151 @@
+/**
+ * 值域总表（唯一来源）
+ *
+ * 游戏里多类数据有固定取值（灵根品级、物品品质、境界、大道阶段……）。
+ * 这些值域此前散落在 业务规则/数据结构/元素生成器 等多个提示词文件里各写一份，
+ * 出现过"三处三个版本"（如灵根倍率）与入口覆盖不全（初始化/事件生成没写灵根值域）的问题。
+ *
+ * 本文件是这些值域的唯一权威定义：
+ * - 代码用 VALUE_DOMAINS 常量做校验/兜底（见 utils/valueGuard.ts）
+ * - 提示词用 renderValueDomainsPrompt() 注入，各入口不再重复定义
+ *
+ * 修改值域时只改这里。
+ */
+
+// ─── 灵根 ────────────────────────────────────────────────
+/** 灵根品级（7 个等级，由弱到强） */
+export const SPIRIT_ROOT_TIERS = ['凡品', '下品', '中品', '上品', '极品', '仙品', '神品'] as const
+/** 灵根异变标记（不是等级，倍率跨 0.5~1.8） */
+export const SPIRIT_ROOT_SPECIAL = '特殊'
+export const SPIRIT_ROOT_ALL_TIERS = [...SPIRIT_ROOT_TIERS, SPIRIT_ROOT_SPECIAL] as const
+
+/** 灵根品级 → 修炼倍率参考值（与 data/creationData.ts 的 base_multiplier 对齐） */
+export const SPIRIT_ROOT_MULTIPLIER: Record<string, number> = {
+  凡品: 1.0, 下品: 1.1, 中品: 1.3, 上品: 1.6, 极品: 2.0, 仙品: 2.4, 神品: 2.8,
+}
+
+/** 灵根品级 → 资质加成比例（判定系统用，见 utils/abilityBonus.ts） */
+export const SPIRIT_ROOT_BONUS: Record<string, number> = {
+  凡品: 0, 下品: 0.02, 中品: 0.05, 上品: 0.10, 极品: 0.15, 仙品: 0.22, 神品: 0.40, 特殊: 0.05,
+}
+
+// ─── 物品 / 功法品质 ──────────────────────────────────────
+/** 物品与功法品质（7 级，由弱到强） */
+export const ITEM_QUALITIES = ['凡', '黄', '玄', '地', '天', '仙', '神'] as const
+/** 品级数值区间：0 残缺；1-3 下品；4-6 中品；7-9 上品；10 极品 */
+export const ITEM_GRADE_RANGES = [
+  { range: '0', name: '残缺' },
+  { range: '1-3', name: '下品' },
+  { range: '4-6', name: '中品' },
+  { range: '7-9', name: '上品' },
+  { range: '10', name: '极品' },
+] as const
+
+// ─── 境界 ────────────────────────────────────────────────
+/** 大境界（9 个，由低到高） */
+export const REALMS = ['凡人', '练气', '筑基', '金丹', '元婴', '化神', '炼虚', '合体', '渡劫'] as const
+/** 小阶段（凡人无阶段） */
+export const REALM_STAGES = ['初期', '中期', '后期', '圆满', '极境'] as const
+
+// ─── 大道 ────────────────────────────────────────────────
+/** 大道阶段总数（下标 0-5） */
+export const DAO_STAGE_COUNT = 6
+/** 大道阶段 → 可炼制的品质上限（上品难度） */
+export const DAO_STAGE_QUALITY = ['凡品', '黄品', '玄品', '地品', '天品', '仙品'] as const
+
+// ─── 天资 ────────────────────────────────────────────────
+/** 天资稀有度范围 */
+export const TALENT_TIER_RARITY = { min: 1, max: 10 } as const
+/** 天资稀有度 → 资质加成比例 */
+export function talentTierBonus(rarity: number): number {
+  if (!Number.isFinite(rarity) || rarity <= 0) return 0
+  const r = Math.min(TALENT_TIER_RARITY.max, Math.max(TALENT_TIER_RARITY.min, Math.round(rarity)))
+  return (r - 1) * 0.03
+}
+
+// ─── 天赋效果 ────────────────────────────────────────────
+/** 天赋效果类型 */
+export const TALENT_EFFECT_TYPES = ['后天六司', '技能加成', '特殊能力'] as const
+/** 「技能加成」可用的技能名 → 对应判定类型（见 utils/abilityBonus.ts） */
+export const TALENT_SKILLS = ['剑法', '刀法', '拳法', '毒术', '炼丹', '炼器', '符箓', '阵法', '医术'] as const
+
+// ─── 功法 ────────────────────────────────────────────────
+/** 功法装备标记写在哪（AI 漏写会导致功法不加成战力） */
+export const TECHNIQUE_EQUIP_PATH = '背包.物品.{功法ID}.已装备 = true'
+export const TECHNIQUE_MAIN_PATH = '功法.功法套装.主修 = {功法ID}'
+export const TECHNIQUE_PROGRESS_PATH = '功法.功法进度.{功法ID}.熟练度 = 0-100'
+
+/** 灵根品级是否为合法值 */
+export function isValidSpiritRootTier(tier: unknown): boolean {
+  return typeof tier === 'string' && (SPIRIT_ROOT_ALL_TIERS as readonly string[]).includes(tier.trim())
+}
+
+/** 物品品质是否为合法值 */
+export function isValidItemQuality(quality: unknown): boolean {
+  return typeof quality === 'string' && (ITEM_QUALITIES as readonly string[]).includes(quality.trim())
+}
+
+/** 校验：返回问题描述数组，空数组表示合法 */
+export function validateValueDomains(data: {
+  灵根?: unknown
+  品质?: unknown
+  品级?: unknown
+}): string[] {
+  const problems: string[] = []
+  if (data.灵根 !== undefined && !isValidSpiritRootTier(data.灵根)) {
+    problems.push(`灵根品级「${data.灵根}」不在允许范围（${SPIRIT_ROOT_ALL_TIERS.join('/')}）`)
+  }
+  if (data.品质 !== undefined && !isValidItemQuality(data.品质)) {
+    problems.push(`物品品质「${data.品质}」不在允许范围（${ITEM_QUALITIES.join('/')}）`)
+  }
+  if (data.品级 !== undefined) {
+    const g = Number(data.品级)
+    if (!Number.isInteger(g) || g < 0 || g > 10) problems.push(`物品品级「${data.品级}」应为 0-10 的整数`)
+  }
+  return problems
+}
+
+// ─── 提示词渲染 ──────────────────────────────────────────
+/**
+ * 渲染值域规范文本，供提示词注入。
+ * 各入口（核心规则/初始化/元素生成/事件生成）统一引用本函数，不再各写一份。
+ */
+export function renderValueDomainsPrompt(): string {
+  const rootTiers = SPIRIT_ROOT_TIERS.join(' < ')
+  const rootMult = SPIRIT_ROOT_TIERS.map(t => `${t}${SPIRIT_ROOT_MULTIPLIER[t]}`).join('|')
+  return `
+[值域规范](唯一来源,所有生成场景通用:开局、剧情、NPC、事件、元素生成器)
+⚠️以下字段只能取规定值，写错会导致系统无法识别、颜色/加成丢失。
+
+[灵根品级]7个等级:${rootTiers};另有"特殊"(异变标记,非等级,如天妒之体)
+ 修炼倍率参考:${rootMult}
+ 灵根名与品级分开写:名字写"金灵根""混沌灵根",品级另填
+ ❌禁止把物品品质当灵根品级:没有"黄品灵根""地品灵根""天品灵根"
+ 分布参考:凡人~练气多凡品~中品;筑基~金丹多中品~上品;元婴多极品;仙品/神品极罕,一个大陆不应扎堆
+
+[物品/功法品质]7个等级:${ITEM_QUALITIES.join(' < ')};品级取0-10整数(${ITEM_GRADE_RANGES.map(g => `${g.range}=${g.name}`).join(',')})
+ 写法:{"quality":"玄","grade":5} 表示玄品中品
+
+[境界]9个大境界:${REALMS.join('→')};小阶段:${REALM_STAGES.join('→')}
+ 凡人没有小阶段(只写"凡人");禁止"练气一层"这类层数写法
+ 突破只能是凡人→练气初期,或进入下一小阶段/大境界初期;不存在"突破到凡人中期"
+
+[大道]阶段固定${DAO_STAGE_COUNT}个(下标0-5),阶段列表必须写满${DAO_STAGE_COUNT}项
+ 阶段名贴合该道意境且各道互不雷同(如丹道:辨药/控火/凝丹/丹纹/丹心/丹成九转)
+ 阶段与炼制能力:${DAO_STAGE_QUALITY.map((q, i) => `阶${i}→${q}`).join('|')}
+ 升阶用 add 当前阶段 +1;阶段名以该道自己的阶段列表为准
+
+[天资]稀有度取 ${TALENT_TIER_RARITY.min}-${TALENT_TIER_RARITY.max} 整数
+
+[天赋效果]类型只能是:${TALENT_EFFECT_TYPES.join('|')}
+ 后天六司:{"类型":"后天六司","目标":"根骨","数值":3}
+ 技能加成:{"类型":"技能加成","技能":"剑法","数值":0.2}  (技能∈${TALENT_SKILLS.join('/')},数值为比例)
+ 特殊能力:{"类型":"特殊能力","名称":"逢凶化吉","数值":0.1}
+
+[功法装备]新建功法必须同时写全三处,缺任一项该功法都不加战力:
+ ${TECHNIQUE_EQUIP_PATH}
+ ${TECHNIQUE_MAIN_PATH}
+ ${TECHNIQUE_PROGRESS_PATH}
+ 非主修功法放背包内 已装备=false 即可;一个角色只 equip 一本主修
+`.trim()
+}

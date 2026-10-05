@@ -12,6 +12,7 @@
 
 import type { SaveData } from '@/types/game'
 import { diag } from '@/utils/diagnostics'
+import { SPIRIT_ROOT_BONUS, talentTierBonus } from '@/utils/prompts/definitions/valueDomains'
 
 /** 判定类型（与 judgement.ts 的 TYPE_WEIGHTS 对齐） */
 export type AbilityActionType =
@@ -58,21 +59,10 @@ const ABILITY_KEYWORDS: Record<string, AbilityActionType[]> = {
 }
 
 /**
- * 灵根品阶 → 资质加成比例（影响修炼与突破）。
- * 7 个等级：凡品 < 下品 < 中品 < 上品 < 极品 < 仙品 < 神品
- * 依据 data/creationData.ts 的 base_multiplier(1.0/1.1/1.3/1.6/2.0/—/2.8~3.2) 定档。
- * 「特殊」不是等级而是异变标记(倍率跨0.5~1.8)，固定按中品档计，不入色阶。
+ * 灵根品阶 → 资质加成比例。
+ * 值域与档位统一由 valueDomains 提供（唯一来源），此处不重复定义。
  */
-const ROOT_TIER_BONUS: Record<string, number> = {
-  凡品: 0,
-  下品: 0.02,
-  中品: 0.05,
-  上品: 0.10,
-  极品: 0.15,
-  仙品: 0.22,
-  神品: 0.40,
-  特殊: 0.05,
-}
+const ROOT_TIER_BONUS = SPIRIT_ROOT_BONUS
 
 /** 非法品阶的保守兜底值（按中品计，并记入诊断告警） */
 const ROOT_TIER_FALLBACK = 0.05
@@ -95,13 +85,6 @@ function gradeRank(item: any): number {
   const qi = order.indexOf(q)
   const g = Number(item?.品质?.grade)
   return (qi < 0 ? 0 : qi + 1) * 10 + (Number.isFinite(g) ? g : 0)
-}
-
-/** 天资稀有度(1-10) → 资质加成比例 */
-function talentTierBonus(rarity: number): number {
-  if (!Number.isFinite(rarity) || rarity <= 0) return 0
-  const r = Math.min(10, Math.max(1, Math.round(rarity)))
-  return (r - 1) * 0.03
 }
 
 /** 功法作用范围：修炼/突破全额，战斗全额，感知减半，其余不受功法影响 */

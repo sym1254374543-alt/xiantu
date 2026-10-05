@@ -16,6 +16,7 @@ import { cloneDeep } from 'lodash';
 import { isSaveDataV3, migrateSaveDataToLatest } from '@/utils/saveMigration';
 import { validateSaveDataV3 } from '@/utils/saveValidationV3';
 import { normalizeBackpackCurrencies } from '@/utils/currencySystem';
+import { guardSpiritRootTier } from '@/utils/valueGuard';
 
 /**
  * 修复并清洗存档数据，确保所有必需字段存在且格式正确
@@ -499,51 +500,19 @@ function repairItem(item: Item): Item {
 }
 
 /**
- * 灵根品阶规范值域。
- * 7 个等级：凡品<下品<中品<上品<极品<仙品<神品；
- * 「特殊」是异变标记（倍率跨 0.5~1.8），不是等级，但属合法取值。
- */
-const CANONICAL_ROOT_TIERS = ['凡品', '下品', '中品', '上品', '极品', '仙品', '神品', '特殊']
-
-/**
- * 物品品质 → 灵根品阶的位置映射（仅用于纠正 AI 误把物品品质写上灵根的情况）。
- * 两套体系跨级不可按名对应，按"由弱到强"的位置对齐：
- *   凡品→凡品 黄品→下品 玄品→中品 地品→上品 天品→极品 仙品→仙品 神品→神品
- */
-const QUALITY_TO_ROOT_TIER: Record<string, string> = {
-  黄品: '下品',
-  玄品: '中品',
-  地品: '上品',
-  天品: '极品',
-}
-
-/**
  * 修复灵根品阶：把误用的物品品质改回灵根规范值域。
- * 就地修改传入对象的 灵根.品级 / 灵根.tier。
+ * 值域与映射统一由 utils/valueGuard.ts 提供（唯一来源），此处仅做委托，
+ * 避免两处各维护一份映射造成不一致。
  * @returns 是否发生了修复
  */
 export function repairSpiritRootTier(holder: any): boolean {
-  const root = holder?.灵根
-  if (!root || typeof root !== 'object') return false
-
-  // 同时处理两种写法
-  for (const key of ['品级', 'tier']) {
-    const raw = root[key]
-    if (typeof raw !== 'string') continue
-    const tier = raw.trim()
-    if (!tier || CANONICAL_ROOT_TIERS.includes(tier)) continue
-
-    const mapped = QUALITY_TO_ROOT_TIER[tier]
-    if (mapped) {
-      root[key] = mapped
-      console.log(`[数据修复] 灵根品阶纠正: 「${tier}」→「${mapped}」(${root.名称 || root.name || ''})`)
-    } else {
-      root[key] = '中品'
-      console.warn(`[数据修复] 灵根品阶「${tier}」无法识别，按中品兜底(${root.名称 || root.name || ''})`)
-    }
-    return true
+  const before = holder?.灵根 && (holder.灵根.品级 ?? holder.灵根.tier)
+  const changed = guardSpiritRootTier(holder)
+  const after = holder?.灵根 && (holder.灵根.品级 ?? holder.灵根.tier)
+  if (changed && before !== after) {
+    console.log(`[数据修复] 灵根品阶纠正: 「${before}」→「${after}」(${holder.灵根?.名称 || holder.灵根?.name || ''})`)
   }
-  return false
+  return changed
 }
 
 /**

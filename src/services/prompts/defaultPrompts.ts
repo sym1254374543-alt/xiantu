@@ -14,6 +14,7 @@ import { promptStorage } from './promptStorage';
 import { isTavernEnv } from '@/utils/tavern';
 // 核心规则
 import { JSON_OUTPUT_RULES, RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS, NARRATIVE_PURITY_RULES } from '@/utils/prompts/definitions/coreRules';
+import { renderValueDomainsPrompt } from '@/utils/prompts/definitions/valueDomains';
 // 业务规则
 import {
   REALM_SYSTEM_RULES,
@@ -110,6 +111,8 @@ const BUSINESS_RULES = [
   PROFESSION_MASTERY_RULES,
   DUAL_REALM_NARRATIVE_RULES,
   DIFFICULTY_ENHANCEMENT_RULES,
+  // 值域规范置于境界/大道规则之前：这些规则的具体取值以它为准（唯一来源）
+  renderValueDomainsPrompt(),
   REALM_SYSTEM_RULES,
   THREE_THOUSAND_DAOS_RULES,
   CRAFTING_DIFFICULTY_RULES,
