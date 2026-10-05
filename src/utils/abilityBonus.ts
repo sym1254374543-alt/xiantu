@@ -59,11 +59,9 @@ const ABILITY_KEYWORDS: Record<string, AbilityActionType[]> = {
 
 /**
  * 灵根品阶 → 资质加成比例（影响修炼与突破）。
- * 规范值域只有 7 种，来自 data/creationData.ts 的 LOCAL_SPIRIT_ROOTS：
- * 凡品/下品/中品/上品/极品/神品/特殊。
- *
- * 注意：不要在此加入「地品/天品/仙品」——那是物品品质(凡黄玄地天仙神)，
- * AI 误用到灵根上是数据错误，应由 NPC 生成规范 + 存档修复解决，而非在此兼容。
+ * 7 个等级：凡品 < 下品 < 中品 < 上品 < 极品 < 仙品 < 神品
+ * 依据 data/creationData.ts 的 base_multiplier(1.0/1.1/1.3/1.6/2.0/—/2.8~3.2) 定档。
+ * 「特殊」不是等级而是异变标记(倍率跨0.5~1.8)，固定按中品档计，不入色阶。
  */
 const ROOT_TIER_BONUS: Record<string, number> = {
   凡品: 0,
@@ -71,8 +69,9 @@ const ROOT_TIER_BONUS: Record<string, number> = {
   中品: 0.05,
   上品: 0.10,
   极品: 0.15,
-  特殊: 0.20,
+  仙品: 0.22,
   神品: 0.40,
+  特殊: 0.05,
 }
 
 /** 非法品阶的保守兜底值（按中品计，并记入诊断告警） */

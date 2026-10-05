@@ -138,7 +138,7 @@
               <dl class="gm-kv nd-kv">
                 <dt>境界</dt><dd>{{ formatRealmWithStage(selected.境界) }}</dd>
                 <dt>灵根</dt>
-                <dd :style="{ color: qualityTone(formatSpiritRoot(selected.灵根).grade) }">
+                <dd :style="{ color: spiritRootTone(selected.灵根) }">
                   {{ formatSpiritRoot(selected.灵根).name }}<template v-if="formatSpiritRoot(selected.灵根).grade"> · {{ formatSpiritRoot(selected.灵根).grade }}</template>
                 </dd>
               </dl>
@@ -271,7 +271,7 @@ import {
 import type { NpcProfile } from '@/types/game';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { formatRealmWithStage } from '@/utils/realmUtils';
-import { qualityTone } from '@/utils/qualityTone';
+import { spiritRootTone } from '@/utils/qualityTone';
 import { isTavernEnv } from '@/utils/tavern';
 import { getNsfwSettingsFromStorage } from '@/utils/nsfw';
 import { toast } from '@/utils/toast';

@@ -246,18 +246,30 @@ const resetActiveSpiritRoot = () => {
   activeSpiritRoot.value = currentSpiritRootChoice() ?? activeSpiritRoot.value
 }
 
-// 品级配色：同时支持中文品级名与组合选择中的 key
-const GRADE_COLORS: Record<string, string> = {
-  凡品: '#9ca3af', common: '#9ca3af',
-  下品: '#8b5cf6', low: '#8b5cf6',
-  中品: '#3b82f6', middle: '#3b82f6',
-  上品: '#10b981', high: '#10b981',
-  极品: '#f59e0b', supreme: '#f59e0b',
-  仙品: '#f97316', 天品: '#f97316', heaven: '#f97316',
-  神品: '#dc2626', divine: '#dc2626',
-  特殊: '#7c3aed', special: '#7c3aed',
+// 灵根品阶共 7 级：凡品<下品<中品<上品<极品<仙品<神品（见 utils/qualityTone.ts）
+// 「特殊」是异变标记而非等级，单列中性色。此处同时兼容中文品级名与英文 key。
+const GRADE_KEYS: Record<string, string> = {
+  凡品: '凡品', common: '凡品',
+  下品: '下品', low: '下品',
+  中品: '中品', middle: '中品',
+  上品: '上品', high: '上品',
+  极品: '极品', supreme: '极品',
+  仙品: '仙品', heaven: '仙品',
+  神品: '神品', divine: '神品',
+  特殊: '特殊', special: '特殊',
 }
-const gradeColor = (tier: string) => GRADE_COLORS[tier] ?? '#9ca3af'
+// 与物品品质共用同一档位色值，保证灵根与物品在同一档次上颜色语义一致
+const ROOT_TIER_HEX: Record<string, string> = {
+  凡品: '#aab3c4',
+  下品: '#cfa95f',
+  中品: '#8ea2f2',
+  上品: '#5fc4a8',
+  极品: '#b894f4',
+  仙品: '#f0a35a',
+  神品: '#f07060',
+  特殊: '#9c93b8',
+}
+const gradeColor = (tier: string) => ROOT_TIER_HEX[GRADE_KEYS[String(tier || '').trim()]] || ROOT_TIER_HEX['凡品']
 const selectionMode = ref<'preset' | 'custom'>('preset')
 const isAdvancedCustomVisible = ref(false)
 const isEditModalVisible = ref(false)

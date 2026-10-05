@@ -93,7 +93,7 @@
           <button
             type="button"
             class="root"
-            :style="{ '--quality': qualityTone(sheet.spiritRoot.value.grade) }"
+            :style="{ '--quality': spiritRootTone(sheet.spiritRoot.value.grade) }"
             @click="showSpiritRoot"
           >
             <span class="root-name">{{ sheet.spiritRoot.value.name }}</span>
@@ -169,7 +169,7 @@ import { useCharacterSheet } from '@/composables/useCharacterSheet';
 import { useCharacterStore } from '@/stores/characterStore';
 import { useUIStore } from '@/stores/uiStore';
 import { REPUTATION_COLOR, formatEffectTime, isBuffEffect } from '@/utils/gameDisplay';
-import { qualityTone } from '@/utils/qualityTone';
+import { spiritRootTone } from '@/utils/qualityTone';
 import { isTavernEnv } from '@/utils/tavern';
 import { getNsfwSettingsFromStorage } from '@/utils/nsfw';
 import StatusDetailCard from '@/components/dashboard/components/StatusDetailCard.vue';
