@@ -331,12 +331,18 @@ export class EnhancedWorldGenerator {
         const rawMemberCount = faction.memberCount ?? faction.成员数量;
         const rawByPosition = rawMemberCount?.byPosition ?? rawMemberCount?.按职位;
 
+        // 领导层键名：新提示词用 首领/首领修为/副手，旧数据用 宗主/宗主修为/副宗主。
+        // 两种都读——只读旧键会丢掉 AI 按新规则给出的首领姓名。
+        const leaderName = rawLeadership?.首领 ?? rawLeadership?.宗主;
+        const leaderRealm = rawLeadership?.首领修为 ?? rawLeadership?.宗主修为;
+        const deputyName = rawLeadership?.副手 ?? rawLeadership?.副宗主;
+
         // 计算声望与综合战力（若可）
         const calcInput: SectCalculationData = {
           名称: faction.name || faction.名称,
           类型: faction.type || faction.类型 || '官方机构',
           等级: faction.level || faction.等级 || '三流',
-          宗主修为: rawLeadership?.宗主修为,
+          宗主修为: leaderRealm,
           最强修为: rawLeadership?.最强修为,
           长老数量: rawByPosition?.长老 || 0,
           核心弟子数: rawLeadership?.核心弟子数,
@@ -349,14 +355,14 @@ export class EnhancedWorldGenerator {
 
         const leadership = rawLeadership
           ? {
-              宗主: rawLeadership.宗主,
-              宗主修为: rawLeadership.宗主修为,
-              副宗主: rawLeadership.副宗主 ?? undefined,
+              宗主: leaderName,
+              宗主修为: leaderRealm,
+              副宗主: deputyName ?? undefined,
               圣女: isHehuan ? (rawLeadership.圣女 ?? undefined) : undefined,
               圣子: isHehuan ? (rawLeadership.圣子 ?? undefined) : undefined,
               太上长老: rawLeadership.太上长老 ?? undefined,
               太上长老修为: rawLeadership.太上长老修为 ?? undefined,
-              最强修为: rawLeadership.最强修为 || rawLeadership.宗主修为,
+              最强修为: rawLeadership.最强修为 || leaderRealm,
               综合战力: calculated.综合战力,
               核心弟子数: rawLeadership.核心弟子数,
               内门弟子数: rawLeadership.内门弟子数,

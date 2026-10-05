@@ -12,7 +12,7 @@ export interface WorldEntityPreview {
 }
 
 const SECTION_PATTERN = /"(continents|factions|locations|大陆信息|势力信息|地点信息)"\s*:/g;
-const NAME_PATTERN = /"(?:name|名称)"\s*:\s*"((?:[^"\\]|\\.){1,40})"/g;
+const MAX_NAME_LENGTH = 60;
 
 const SECTION_ALIAS: Record<string, WorldEntityGroup> = {
   continents: 'continents',
@@ -23,32 +23,91 @@ const SECTION_ALIAS: Record<string, WorldEntityGroup> = {
   地点信息: 'locations',
 };
 
+/**
+ * 抽取片段里「浅层」的名称键（按 JSON 嵌套深度过滤，去重）。
+ *
+ * 势力对象内部还嵌着 成员数量.成员:[{名称:…}]（成员分层）——每个职位名都带
+ * 「名称」键。早先用正则匹配所有 "名称"，会把这些阶层名也当成势力名收进列表，
+ * 于是"初始化时展示的不是势力，而是每一个阶层"。此处改为按深度只取数组项自身的键：
+ * `[`→1、`{势力}`→2（取此层）、`{成员}`→更深（不取）。
+ */
+function extractShallowNames(segment: string, maxDepth = 2): string[] {
+  const names: string[] = [];
+  let depth = 0;
+  let i = 0;
+  const n = segment.length;
+  while (i < n) {
+    const ch = segment[i];
+    if (ch !== '"') {
+      if (ch === '{' || ch === '[') depth++;
+      else if (ch === '}' || ch === ']') { if (depth > 0) depth--; }
+      i++;
+      continue;
+    }
+    // 读一个字符串字面量（含转义）；流式文本可能截断在半截字符串里
+    let j = i + 1;
+    let key = '';
+    let closed = false;
+    while (j < n) {
+      const c = segment[j];
+      if (c === '\\') { key += segment[j + 1] ?? ''; j += 2; continue; }
+      if (c === '"') { closed = true; break; }
+      key += c; j++;
+    }
+    if (!closed) break;
+
+    // 该字符串是键吗？后面紧跟冒号才算
+    let k = j + 1;
+    while (k < n && /\s/.test(segment[k])) k++;
+    const isKey = segment[k] === ':';
+    if (isKey && depth > 0 && depth <= maxDepth && (key === '名称' || key === 'name')) {
+      let v = k + 1;
+      while (v < n && /\s/.test(segment[v])) v++;
+      if (segment[v] === '"') {
+        let p = v + 1;
+        let val = '';
+        let vClosed = false;
+        while (p < n) {
+          const c = segment[p];
+          if (c === '\\') { val += segment[p + 1] ?? ''; p += 2; continue; }
+          if (c === '"') { vClosed = true; break; }
+          val += c; p++;
+        }
+        if (vClosed) {
+          const name = val.replace(/\\"/g, '"').trim();
+          if (name && name.length <= MAX_NAME_LENGTH) names.push(name);
+        }
+      }
+    }
+    i = j + 1;
+  }
+  return names;
+}
+
 /** 按出现顺序抽取世界 JSON 中各分区的名称（去重） */
 export function extractWorldEntities(stream: string): WorldEntityPreview {
   const result: WorldEntityPreview = { continents: [], factions: [], locations: [] };
   if (!stream) return result;
 
-  const sections: Array<{ index: number; group: WorldEntityGroup }> = [];
+  const sections: Array<{ index: number; end: number; group: WorldEntityGroup }> = [];
   for (const match of stream.matchAll(SECTION_PATTERN)) {
-    sections.push({ index: match.index ?? 0, group: SECTION_ALIAS[match[1]] });
+    const index = match.index ?? 0;
+    sections.push({ index, end: index + match[0].length, group: SECTION_ALIAS[match[1]] });
   }
   if (sections.length === 0) return result;
 
   const seen = new Set<string>();
-  let sectionCursor = -1;
-  for (const match of stream.matchAll(NAME_PATTERN)) {
-    const index = match.index ?? 0;
-    while (sectionCursor + 1 < sections.length && sections[sectionCursor + 1].index < index) {
-      sectionCursor++;
+  sections.forEach((section, i) => {
+    // 该分区的值：从冒号后到下一个分区标记（或流末尾）
+    const valueEnd = i + 1 < sections.length ? sections[i + 1].index : stream.length;
+    const segment = stream.slice(section.end, valueEnd);
+    for (const name of extractShallowNames(segment)) {
+      const dedupeKey = `${section.group}:${name}`;
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      result[section.group].push(name);
     }
-    if (sectionCursor < 0) continue;
-    const group = sections[sectionCursor].group;
-    const name = match[1].replace(/\\"/g, '"').trim();
-    const dedupeKey = `${group}:${name}`;
-    if (!name || seen.has(dedupeKey)) continue;
-    seen.add(dedupeKey);
-    result[group].push(name);
-  }
+  });
   return result;
 }
 
