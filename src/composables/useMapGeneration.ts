@@ -80,6 +80,9 @@ export function useMapGeneration(data: WorldMapData) {
         maxRetries: 3,
         retryDelay: 1000,
         enableHehuanEasterEgg: egg,
+        // 大洲已由「世界框架」生成，此处只补势力与地点：把既有边界喂给 AI，
+        // 否则它会另排一套网格摆势力，导致势力名与所在大洲错位（与追加模式同因）
+        existingContinents: ((wi as any).大陆信息 || []).map((c: any) => ({ 名称: c.名称 || c.name, 大洲边界: c.大洲边界 || c.continent_bounds })),
         onStreamChunk: (chunk: string) => {
           status.value = chunk;
         },
@@ -116,6 +119,8 @@ export function useMapGeneration(data: WorldMapData) {
         enableHehuanEasterEgg: egg,
         existingFactions: (wi.势力信息 || []).map((f: any) => ({ 名称: f.名称 || f.name, 位置: f.位置 || f.location, 势力范围: f.势力范围 || f.territory })),
         existingLocations: (wi.地点信息 || []).map((l: any) => ({ 名称: l.名称 || l.name, coordinates: l.coordinates || l.坐标 })),
+        // 大洲不会重新生成，必须把既有边界喂给 AI——否则它另排一套网格摆新势力，势力会落到错误的洲
+        existingContinents: (wi.大陆信息 || []).map((c: any) => ({ 名称: c.名称 || c.name, 大洲边界: c.大洲边界 || c.continent_bounds })),
       } as any).generateValidatedWorld();
       if (!result.success || !result.worldInfo) throw new Error(result.errors?.join('，') || '生成失败');
       const nf = result.worldInfo.势力信息 || [];

@@ -50,6 +50,12 @@ export interface EnhancedWorldGenConfig {
   enableHehuanEasterEgg?: boolean; // 是否启用合欢宗彩蛋（仅在地图初始化时启用）
   existingFactions?: Array<{ 名称: string; 位置?: any; 势力范围?: any[] }>; // 现有势力（防止重叠）
   existingLocations?: Array<{ 名称: string; coordinates?: any }>; // 现有地点（防止重叠）
+  /**
+   * 现有大洲（追加势力/地点时必传）。
+   * 追加模式下大洲不会重新生成，若不把既有边界喂给 AI，AI 会另排一套网格并按它摆势力，
+   * 结果势力名与所在大洲错位（如中国机构被放进北美洲格）。
+   */
+  existingContinents?: Array<{ 名称?: string; 大洲边界?: any[] }>;
 }
 
 export class EnhancedWorldGenerator {
@@ -259,6 +265,22 @@ export class EnhancedWorldGenerator {
           ).join('\n');
           defaultPrompt += `\n已有地点：\n${locationList}`;
         }
+      }
+
+      // 🔥 追加模式下大洲已确定：把既有边界喂给 AI 并要求照抄，否则 AI 会另排网格、
+      // 按自己的网格摆新势力，导致势力名与所在大洲错位（用户报障"北美和亚洲反了"）。
+      if (this.config.existingContinents?.length) {
+        const continentList = this.config.existingContinents
+          .map(c => `- ${c.名称}${c.大洲边界?.length ? ` 边界:${JSON.stringify(c.大洲边界)}` : ''}`)
+          .join('\n');
+        defaultPrompt += `
+
+【已有大洲（照抄，禁止重新设计）】
+本次是在**已有世界**上追加内容，大洲已经确定——不要重新生成、不要重新排列大洲。
+continents 数组必须原样照抄下列大洲（名称、顺序、边界坐标一字不改）：
+${continentList}
+新生成的势力与地点的坐标，必须落在**对应大洲**的边界内，且势力名与所在大洲的地域相符
+（如中国机构放亚洲、美国机构放北美洲、欧洲机构放欧洲）。`;
       }
 
       // 如果用户有自定义提示词且不为空，使用自定义的
