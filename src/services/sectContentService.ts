@@ -405,10 +405,8 @@ export async function evolveMember(ctx: SectContext, member: { key: string; name
     sectProfile: {
       宗门名称: sectName,
       宗门描述: ctx.profile.value?.描述 || '',
-      境界分布: ctx.profile.value?.境界分布 || '',
       宗主修为: l.宗主修为 || '',
       太上长老修为: l.太上长老修为 || '',
-      最强修为: l.最强修为 || '',
     },
   }));
   if (!parsed.职位 && !parsed.境界) throw new Error('演化数据缺失');

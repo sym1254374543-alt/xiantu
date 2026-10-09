@@ -397,11 +397,7 @@ const currencies = computed(() => {
   const bag = selected.value?.背包;
   if (!bag) return [];
   const wallet = bag.货币 && typeof bag.货币 === 'object' ? Object.values(bag.货币) : [];
-  if (wallet.length) return wallet.filter((c) => toNumber(c?.数量) > 0).map((c) => ({ name: c.名称 || c.币种, amount: toNumber(c.数量) }));
-  const stones = bag.灵石 || ({} as Record<string, number>);
-  return (['下品', '中品', '上品', '极品'] as const)
-    .filter((k) => toNumber(stones[k]) > 0)
-    .map((k) => ({ name: `${k}灵石`, amount: toNumber(stones[k]) }));
+  return wallet.filter((c) => toNumber(c?.数量) > 0).map((c) => ({ name: c.名称 || c.币种, amount: toNumber(c.数量) }));
 });
 
 const npcSplendor = computed(() => splendorFromNpc(selected.value));

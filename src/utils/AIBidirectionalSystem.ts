@@ -21,6 +21,7 @@ import { updateStatusEffects } from './statusEffectManager';
 import { sanitizeAITextForDisplay } from '@/utils/textSanitizer';
 import { validateAndRepairNpcProfile } from '@/utils/dataValidation';
 import { stripNsfwContent } from '@/utils/prompts/definitions/dataDefinitions';
+import { RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS, NARRATIVE_PURITY_RULES } from '@/utils/prompts/definitions/coreRules';
 import { isSaveDataV3, migrateSaveDataToLatest } from './saveMigration';
 import { parseJsonSmart } from '@/utils/jsonExtract';
 import type { APIUsageType } from '@/stores/apiManagementStore';
@@ -732,9 +733,14 @@ ${stateJsonString}
             // 🔥 添加精简版存档数据，用于叙事判定（知道玩家装备、状态、NPC关系等）
             const narrativeStateJson = stateJsonString;
             // 只给叙事相关的提示词，不给coreOutputRules/dataDefinitions等指令格式提示词
+            // 但[叙事纯净]是叙事规则，单步/分步共用同一份常量（见 coreRules.ts），故在此注入
             return `
 ${stepRules}${imageRules}
 ${styleBlock ? `\n\n---\n\n${styleBlock}` : ''}
+
+---
+
+${NARRATIVE_PURITY_RULES}
 
 ---
 
@@ -768,8 +774,10 @@ ${narrativeStateJson}
           const sanitizedDataDefinitionsPrompt = tavernEnv ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt);
 
           // 第2步：指令生成（CoT 自检清单已合并到 splitGenerationStep2 提示词中）
+          // 注入与单步共用的硬规则：路径/数据同步/指令清单/交易/名称引用 + 结构严格性。
+          // 不注入 coreOutputRules（它要求输出 text，与本步"禁止 text"冲突），只取其中两个分块。
           const stepRules = (await getPrompt('splitGenerationStep2')).trim();
-          const sections: string[] = [stepRules];
+          const sections: string[] = [stepRules, RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS];
 
           const sanitizedBusinessRulesPrompt = tavernEnv ? businessRulesPrompt : stripNsfwContent(businessRulesPrompt);
           const sanitizedExtendedRulesPrompt = tavernEnv ? extendedRulesPrompt : stripNsfwContent(extendedRulesPrompt);
@@ -1016,6 +1024,10 @@ ${stepRules}${imageRules}
 
 ---
 
+${NARRATIVE_PURITY_RULES}
+
+---
+
 # 世界观设定
 ${worldStandardsPrompt}
 
@@ -1040,7 +1052,7 @@ ${userPrompt}
           const sanitizedDataDefinitionsPrompt = tavernEnv ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt);
           const sanitizedBusinessRulesPrompt = tavernEnv ? businessRulesPrompt : stripNsfwContent(businessRulesPrompt);
 
-          const sections: string[] = [stepRules];
+          const sections: string[] = [stepRules, RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS];
 
           // 🔥 酒馆端：注入身体数据生成要求
           if (tavernEnv) {
@@ -2476,8 +2488,8 @@ ${saveDataJson}`, role: 'system', depth: 4, position: 'in_chat' },
         }
         const newValue = currentValue + value;
 
-        // 🔥 防止灵石变成负数
-        if (path.includes('灵石') && newValue < 0) {
+        // 🔥 防止钱物变成负数（灵石既是物品也是货币，一并守住）
+        if ((path.includes('灵石') || path.includes('余额') || path.includes('数量')) && newValue < 0) {
           console.warn(`[AI双向系统] ${path} 执行add后会变成负数 (${currentValue} + ${value} = ${newValue})，已限制为0`);
           set(saveData, path, 0);
         } else {

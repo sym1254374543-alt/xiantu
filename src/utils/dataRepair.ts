@@ -15,7 +15,7 @@ import type { GradeType } from '@/data/itemQuality';
 import { cloneDeep } from 'lodash';
 import { isSaveDataV3, migrateSaveDataToLatest } from '@/utils/saveMigration';
 import { validateSaveDataV3 } from '@/utils/saveValidationV3';
-import { normalizeBackpackCurrencies } from '@/utils/currencySystem';
+import { normalizeBackpackCurrencies, migrateSpiritStonesToItems, normalizeBankCard } from '@/utils/currencySystem';
 import { guardEntityDomains } from '@/utils/valueGuard';
 
 /**
@@ -115,17 +115,8 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
 
     // --- 背包 ---
     if (!repaired.角色.背包 || typeof repaired.角色.背包 !== 'object') {
-      repaired.角色.背包 = { 灵石: { 下品: 0, 中品: 0, 上品: 0, 极品: 0 }, 物品: {} };
+      repaired.角色.背包 = { 物品: {} };
     } else {
-      if (!repaired.角色.背包.灵石 || typeof repaired.角色.背包.灵石 !== 'object') {
-        repaired.角色.背包.灵石 = { 下品: 0, 中品: 0, 上品: 0, 极品: 0 };
-      } else {
-        repaired.角色.背包.灵石.下品 = validateNumber(repaired.角色.背包.灵石.下品, 0, 999999999, 0);
-        repaired.角色.背包.灵石.中品 = validateNumber(repaired.角色.背包.灵石.中品, 0, 999999999, 0);
-        repaired.角色.背包.灵石.上品 = validateNumber(repaired.角色.背包.灵石.上品, 0, 999999999, 0);
-        repaired.角色.背包.灵石.极品 = validateNumber(repaired.角色.背包.灵石.极品, 0, 999999999, 0);
-      }
-
       if (!repaired.角色.背包.物品 || typeof repaired.角色.背包.物品 !== 'object') {
         repaired.角色.背包.物品 = {};
       } else {
@@ -142,6 +133,11 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
 
     // --- 背包.货币（新货币系统，兼容旧存档） ---
     normalizeBackpackCurrencies(repaired.角色.背包 as any);
+
+    // --- 银行账户（可选；归一化后为空则视为未开户） ---
+    const fixedBank = normalizeBankCard((repaired.角色 as any).银行);
+    if (fixedBank) (repaired.角色 as any).银行 = fixedBank;
+    else delete (repaired.角色 as any).银行;
 
     // --- 社交.关系 ---
     const playerName = typeof repaired.角色?.身份?.名字 === 'string' ? repaired.角色.身份.名字.trim() : '';
@@ -566,13 +562,13 @@ function repairNpc(npc: NpcProfile): NpcProfile {
     repaired.记忆 = [];
   }
 
-  // 修复背包
+  // 修复背包：NPC 也不再持有灵石货币，旧的 背包.灵石 迁为「材料」物品
   if (!repaired.背包 || typeof repaired.背包 !== 'object') {
-    repaired.背包 = {
-      灵石: { 下品: 0, 中品: 0, 上品: 0, 极品: 0 },
-      物品: {}
-    };
+    repaired.背包 = { 物品: {} };
+  } else if (typeof repaired.背包.物品 !== 'object' || repaired.背包.物品 === null) {
+    repaired.背包.物品 = {};
   }
+  migrateSpiritStonesToItems(repaired.背包);
 
   return repaired;
 }
@@ -656,7 +652,7 @@ function createMinimalSaveDataV3(): SaveData {
       位置: createDefaultLocation(),
       效果: [],
       身体: { 总体状况: '', 部位: {} },
-      背包: { 灵石: { 下品: 0, 中品: 0, 上品: 0, 极品: 0 }, 物品: {} },
+      背包: { 物品: {} },
       装备: { 装备1: null, 装备2: null, 装备3: null, 装备4: null, 装备5: null, 装备6: null },
       功法: { 当前功法ID: null, 功法进度: {}, 功法套装: { 主修: null, 辅修: [] } },
       修炼: { 修炼功法: null, 修炼状态: { 模式: '未修炼' } },

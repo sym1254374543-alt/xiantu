@@ -56,6 +56,12 @@ export interface EnhancedWorldGenConfig {
    * 结果势力名与所在大洲错位（如中国机构被放进北美洲格）。
    */
   existingContinents?: Array<{ 名称?: string; 大洲边界?: any[] }>;
+  /**
+   * 指定势力（「按名字追加势力」用）。
+   * 名称必须原样使用；`史实` 是从存档记忆/事件/叙事里检索到的相关片段，
+   * 供 AI 把该势力写成与已发生的剧情一致的样子。
+   */
+  requiredFactions?: Array<{ 名称: string; 史实?: string[] }>;
 }
 
 export class EnhancedWorldGenerator {
@@ -236,8 +242,12 @@ export class EnhancedWorldGenerator {
       let defaultPrompt = EnhancedWorldPromptBuilder.buildPrompt(promptConfig);
 
       // 🔥 注入合欢宗要求
+      // 注入块单独累积：它们是"本次生成的世界事实约束"，与提示词风格无关，
+      // 因此即便用户自定义了 worldGeneration 提示词也必须带上（否则指定势力/已有大洲会静默失效）
+      let injections = '';
+
       if (shouldGenerateHehuan) {
-        defaultPrompt += `
+        injections += `
 
 【特殊要求】
 请务必在势力列表中包含一个名为"合欢宗"的势力：
@@ -247,9 +257,12 @@ export class EnhancedWorldGenerator {
 - 领导层中必须包含"圣女"字段（圣女姓名）`;
       }
 
+      // 🔥 按名字追加势力：用户指定了势力名，必须原样生成
+      injections += this.buildRequiredFactionsBlock();
+
       // 🔥 注入现有地点和势力信息（防止重叠）
       if (this.config.existingFactions?.length || this.config.existingLocations?.length) {
-        defaultPrompt += `
+        injections += `
 
 【已有地点势力（禁止重叠）】
 新生成的地点和势力必须避开以下已有位置，坐标不能重叠：`;
@@ -257,13 +270,13 @@ export class EnhancedWorldGenerator {
           const factionList = this.config.existingFactions.map(f =>
             `- ${f.名称}${f.位置 ? `(位置:${JSON.stringify(f.位置)})` : ''}`
           ).join('\n');
-          defaultPrompt += `\n已有势力：\n${factionList}`;
+          injections += `\n已有势力：\n${factionList}`;
         }
         if (this.config.existingLocations?.length) {
           const locationList = this.config.existingLocations.map(l =>
             `- ${l.名称}${l.coordinates ? `(坐标:x=${l.coordinates.x},y=${l.coordinates.y})` : ''}`
           ).join('\n');
-          defaultPrompt += `\n已有地点：\n${locationList}`;
+          injections += `\n已有地点：\n${locationList}`;
         }
       }
 
@@ -273,7 +286,7 @@ export class EnhancedWorldGenerator {
         const continentList = this.config.existingContinents
           .map(c => `- ${c.名称}${c.大洲边界?.length ? ` 边界:${JSON.stringify(c.大洲边界)}` : ''}`)
           .join('\n');
-        defaultPrompt += `
+        injections += `
 
 【已有大洲（照抄，禁止重新设计）】
 本次是在**已有世界**上追加内容，大洲已经确定——不要重新生成、不要重新排列大洲。
@@ -283,18 +296,47 @@ ${continentList}
 （如中国机构放亚洲、美国机构放北美洲、欧洲机构放欧洲）。`;
       }
 
+      let basePrompt = defaultPrompt;
       // 如果用户有自定义提示词且不为空，使用自定义的
       // 注意：promptStorage.get 在用户未修改时会返回默认值，所以需要检查是否真的被修改过
       if (customPrompt && customPrompt.trim()) {
         // 检查是否是用户修改过的（通过检查 modified 标记）
         const allPrompts = await promptStorage.loadAll();
         if (allPrompts['worldGeneration']?.modified) {
-          return customPrompt;
+          basePrompt = customPrompt;
         }
       }
 
-      return defaultPrompt;
+      return basePrompt + injections;
     }
+
+  /**
+   * 「按名字追加势力」的注入块：用户指定了势力名时，要求 AI 原样生成这些势力，
+   * 并把从记忆里检索到的史实一并给出，使其与已发生的剧情一致。
+   */
+  private buildRequiredFactionsBlock(): string {
+    const list = this.originalConfigRequiredFactions();
+    if (!list.length) return '';
+    const lines = list.map((f) => {
+      const lore = (f.史实 || []).slice(0, 6);
+      return [
+        `### ${f.名称}`,
+        '- 名称必须一字不改地使用；类型/等级/位置按世界背景与下列史实推断，坐标落在相应大洲内',
+        '- 必须写全 领导层（首领/首领修为/副手）与 主要成员（3-6 个具名人物）',
+        lore.length ? '- 剧情里已经提到过它，必须与下列史实一致：' : '- 剧情里尚未细写，按名字的字面含义合理发挥',
+        ...lore.map((t) => `  · ${t}`),
+      ].join('\n');
+    });
+    return `
+
+【指定势力（必须生成，名称原样使用）】
+本次必须生成且**只生成**下列 ${list.length} 个势力（factions 数组长度 = ${list.length}）：
+${lines.join('\n')}`;
+  }
+
+  private originalConfigRequiredFactions(): Array<{ 名称: string; 史实?: string[] }> {
+    return this.config.requiredFactions ?? [];
+  }
 
   /**
    * 解析AI响应 - 智能处理强JSON模式和普通模式
@@ -348,10 +390,8 @@ ${continentList}
         大洲边界: continent.continent_bounds || continent.大洲边界 || []
       })),
       势力信息: (rawData.factions || []).map((faction: Record<string, any>) => {
-        // 世界生成提示词要求输出中文键（领导层/成员数量），旧生成器用英文键，两种都接
+        // 世界生成提示词要求输出中文键（领导层/主要成员），旧生成器用英文键，两种都接
         const rawLeadership = faction.leadership ?? faction.领导层;
-        const rawMemberCount = faction.memberCount ?? faction.成员数量;
-        const rawByPosition = rawMemberCount?.byPosition ?? rawMemberCount?.按职位;
 
         // 领导层键名：新提示词用 首领/首领修为/副手，旧数据用 宗主/宗主修为/副宗主。
         // 两种都读——只读旧键会丢掉 AI 按新规则给出的首领姓名。
@@ -359,19 +399,12 @@ ${continentList}
         const leaderRealm = rawLeadership?.首领修为 ?? rawLeadership?.宗主修为;
         const deputyName = rawLeadership?.副手 ?? rawLeadership?.副宗主;
 
-        // 计算声望与综合战力（若可）
-        const calcInput: SectCalculationData = {
+        const calculated = calculateSectData({
           名称: faction.name || faction.名称,
           类型: faction.type || faction.类型 || '官方机构',
           等级: faction.level || faction.等级 || '三流',
           宗主修为: leaderRealm,
-          最强修为: rawLeadership?.最强修为,
-          长老数量: rawByPosition?.长老 || 0,
-          核心弟子数: rawLeadership?.核心弟子数,
-          内门弟子数: rawLeadership?.内门弟子数,
-          外门弟子数: rawLeadership?.外门弟子数
-        };
-        const calculated = calculateSectData(calcInput);
+        } as SectCalculationData);
         const factionName = String(faction.name || faction.名称 || '');
         const isHehuan = factionName.includes('合欢');
 
@@ -384,24 +417,19 @@ ${continentList}
               圣子: isHehuan ? (rawLeadership.圣子 ?? undefined) : undefined,
               太上长老: rawLeadership.太上长老 ?? undefined,
               太上长老修为: rawLeadership.太上长老修为 ?? undefined,
-              最强修为: rawLeadership.最强修为 || leaderRealm,
-              综合战力: calculated.综合战力,
-              核心弟子数: rawLeadership.核心弟子数,
-              内门弟子数: rawLeadership.内门弟子数,
-              外门弟子数: rawLeadership.外门弟子数
             }
           : undefined;
 
-        // 成员构成：按职位分层 [{名称,人数,境界}]。两种键名都接，旧的两套统计
-        // （按境界/按职位）由 sectDataValidator 归一化，这里只透传原始数据。
-        const rawTiers = rawMemberCount?.成员 ?? rawMemberCount?.职位;
-        const memberCount = rawMemberCount
-          ? {
-              total: Number(rawMemberCount.total ?? rawMemberCount.总数) || 0,
-              成员: Array.isArray(rawTiers) ? rawTiers : undefined,
-              byPosition: rawByPosition || undefined,
-              byRealm: rawMemberCount.byRealm || rawMemberCount.按境界 || undefined,
-            }
+        // 具名成员名单（编制）：中文键 主要成员，兼容英文 members
+        const rawMembers = faction.主要成员 ?? faction.members;
+        const 主要成员 = Array.isArray(rawMembers)
+          ? rawMembers
+              .map((m: Record<string, any>) => ({
+                名字: String(m.名字 ?? m.name ?? '').trim(),
+                职位: String(m.职位 ?? m.position ?? m.title ?? '').trim(),
+                境界: String(m.境界 ?? m.realm ?? '').trim() || undefined,
+              }))
+              .filter((m: { 名字: string }) => !!m.名字)
           : undefined;
 
         const territoryInfo = faction.territoryInfo
@@ -427,15 +455,7 @@ ${continentList}
           领导层: leadership,
           leadership,
 
-          成员数量: memberCount
-            ? {
-                总数: memberCount.total,
-                成员: memberCount.成员,
-                ...(memberCount.byPosition ? { 按职位: memberCount.byPosition } : {}),
-                ...(memberCount.byRealm ? { 按境界: memberCount.byRealm } : {}),
-              }
-            : undefined,
-          memberCount,
+          主要成员: 主要成员 && 主要成员.length ? 主要成员 : undefined,
 
           势力范围详情: territoryInfo
             ? {
@@ -664,7 +684,8 @@ export async function generateRealmMap(config: RealmMapGenConfig): Promise<Realm
         位置: f.location ?? f.位置 ?? '',
         与玩家关系: f.playerRelation ?? f.与玩家关系 ?? '中立',
         可否加入: f.canJoin ?? f.可否加入 ?? false,
-        领导层: f.leaderRealm ? { 宗主: f.leader ?? '未知', 宗主修为: f.leaderRealm, 最强修为: f.leaderRealm } : undefined,
+        领导层: f.leaderRealm ? { 宗主: f.leader ?? '未知', 宗主修为: f.leaderRealm } : undefined,
+        主要成员: Array.isArray(f.members) && f.members.length ? f.members : undefined,
       }));
 
       const locations = (raw.locations ?? []).map((l: any) => ({

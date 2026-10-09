@@ -7,6 +7,7 @@
  */
 import type { NpcProfile, SaveData, WorldInfo } from '@/types/game';
 import { isTavernEnv } from '@/utils/tavern';
+import { buildSpiritStoneItems } from '@/utils/currencySystem';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export function applyHehuanSectEasterEgg(worldInfo: WorldInfo, saveData: SaveData): void {
@@ -26,7 +27,7 @@ export function applyHehuanSectEasterEgg(worldInfo: WorldInfo, saveData: SaveDat
         : ({} as any);
 
     if (!nextLeadership.宗主) nextLeadership.宗主 = '合欢老魔';
-    if (!nextLeadership.最强修为) nextLeadership.最强修为 = nextLeadership.宗主修为 || '化神期';
+    if (!nextLeadership.宗主修为) nextLeadership.宗主修为 = '化神期';
 
     if (!nextLeadership.圣女) {
       nextLeadership.圣女 = '灰夫人(合欢圣女)';
@@ -73,7 +74,7 @@ export function applyHehuanSectEasterEgg(worldInfo: WorldInfo, saveData: SaveDat
         ],
         当前外貌状态: "衣衫半解，媚眼如丝",
         当前内心想法: "观察着周围的人，寻找能让我感兴趣的猎物",
-        背包: { 灵石: { 下品: 5000, 中品: 500, 上品: 50, 极品: 0 }, 物品: {} },
+        背包: { 物品: buildSpiritStoneItems({ 下品: 5000, 中品: 500, 上品: 50 }) },
         实时关注: true, // 关键：让AI主动关注此NPC
         私密信息: {
           是否为处女: true,

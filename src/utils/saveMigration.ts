@@ -354,7 +354,7 @@ export function migrateSaveDataToLatest(raw: SaveData): { migrated: SaveDataV3; 
 
   const flatTime = coerceTime(source.元数据?.时间 ?? source.时间 ?? source.游戏时间);
 
-  const flatInventory = source.背包 ?? { 灵石: { 下品: 0, 中品: 0, 上品: 0, 极品: 0 }, 物品: {} };
+  const flatInventory = source.背包 ?? { 物品: {} };
   // 新货币系统迁移（兼容旧存档）
   if (flatInventory && typeof flatInventory === 'object') {
     normalizeBackpackCurrencies(flatInventory as any);

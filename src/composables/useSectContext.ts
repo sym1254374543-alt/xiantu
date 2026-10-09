@@ -108,6 +108,18 @@ export function useSectContext() {
         list.push({ key: name, name, gender: '', position: '同门', realm: '', favor: 0, category: '外门', known: false });
       }
     }
+    // 势力档案里的「主要成员」编制名单：可以有尚未登场的人（known=false），
+    // 但带职位与境界；同名者以已登场的 NPC 档案为准（见上面第一段）。
+    const rosterProfile = profile.value?.主要成员;
+    if (Array.isArray(rosterProfile)) {
+      for (const raw of rosterProfile) {
+        const name = String(raw?.名字 || '').trim();
+        if (!name || names.has(name)) continue;
+        names.add(name);
+        const pos = String(raw?.职位 || '成员');
+        list.push({ key: name, name, gender: '', position: pos, realm: String(raw?.境界 || ''), favor: 0, category: memberCategory(pos), known: false });
+      }
+    }
     return list;
   });
 

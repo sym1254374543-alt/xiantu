@@ -17,7 +17,8 @@ import type {
   PlayerLocation,
   WorldInfo,
   EventSystem,
-  BodyStats
+  BodyStats,
+  BankCard
 } from '@/types/game';
 
 /**
@@ -114,6 +115,8 @@ export interface SaveDataV3 {
     位置: PlayerLocation;
     效果: StatusEffect[];
     身体?: BodyStats;
+    /** 银行账户（可选：角色可能还没开户） */
+    银行?: BankCard;
     背包: Inventory;
     装备: Equipment;
     功法: TechniqueSystemV3;

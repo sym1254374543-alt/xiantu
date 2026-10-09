@@ -7,6 +7,21 @@
 import { getTavernHelper } from '../tavern';
 import { parseJsonSmart } from '../jsonExtract';
 import { promptStorage } from '@/services/promptStorage';
+import { LOCATION_TYPES } from '@/utils/prompts/definitions/valueDomains';
+
+/**
+ * 地点类型的一句话说明。键必须与 valueDomains 的 LOCATION_TYPES 完全一致——
+ * 用 Record<typeof LOCATION_TYPES[number], string> 约束，新增类型漏写会编译报错。
+ */
+const LOCATION_TYPE_DESC: Record<(typeof LOCATION_TYPES)[number], string> = {
+  山川湖海: '自然地标（山脉、河流、湖泊、海岸）',
+  城镇都市: '人类聚居地（城市、城镇、村落、街区）',
+  势力据点: '势力的总部或分部（官方机构、财团、家族、研究所、教团；古老道统的道场亦属此类）',
+  灵脉宝地: '灵气浓郁、适宜修炼之处',
+  异变区域: '灵气复苏后出现异常的地点（异象、遗迹现世、生物异变）',
+  凶险之地: '危险区域（凶兽领地、失控地带、禁地）',
+  其他特殊: '不属于以上各类的特殊地点',
+};
 
 // ─── 类型 ─────────────────────────────────────────────────────────────────
 
@@ -57,13 +72,7 @@ const DEFAULT_PROMPT = `你是修仙世界的地图规划师。为一个新出�
 - 金丹期及以上：可跨大陆活动
 
 【地点类型】
-- 山川湖海：自然地标（山脉、河流、湖泊、海岸）
-- 城镇都市：人类聚居地（城市、城镇、村落、街区）
-- 势力据点：势力的总部或分部（官方机构、财团、家族、研究所、教团；古老道统的道场亦属此类）
-- 灵脉宝地：灵气浓郁、适宜修炼之处
-- 异变区域：灵气复苏后出现异常的地点（异象、遗迹现世、生物异变）
-- 凶险之地：危险区域（凶兽领地、失控地带、禁地）
-- 其他特殊：不属于以上各类的特殊地点
+${LOCATION_TYPES.map((t) => `- ${t}：${LOCATION_TYPE_DESC[t]}`).join('\n')}
 
 【定位思路】
 - 结合位置描述路径：路径里的上级地点附近优先

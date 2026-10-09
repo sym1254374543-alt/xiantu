@@ -92,7 +92,7 @@ function characterSnapshot() {
   const a = gs.attributes as any;
   const list = Object.entries(((gs.thousandDao as any)?.大道列表 || {}) as Record<string, any>)
     .filter(([, d]) => d && d.是否解锁 !== false)
-    .map(([name, d]) => `${name}·阶段${daoStageIndex(d)}`)
+    .map(([name, d]) => `${name}·第${daoStageIndex(d) + 1}阶`)
     .slice(0, 20);
   return {
     先天六司: c?.先天六司 ?? {},

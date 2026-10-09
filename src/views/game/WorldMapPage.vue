@@ -47,8 +47,18 @@
         <label><input v-model="appendOpt.locations" type="checkbox" /> 地点</label>
         <input v-model.number="appendOpt.locationCount" class="gm-field num" type="number" min="1" max="10" :disabled="!appendOpt.locations" aria-label="地点数" />
         <label><input v-model="appendOpt.factions" type="checkbox" /> 势力</label>
-        <input v-model.number="appendOpt.factionCount" class="gm-field num" type="number" min="1" max="5" :disabled="!appendOpt.factions" aria-label="势力数" />
-        <button type="submit" class="cc-btn small primary" :disabled="!appendOpt.locations && !appendOpt.factions">生成</button>
+        <input v-model.number="appendOpt.factionCount" class="gm-field num" type="number" min="1" max="5" :disabled="!appendOpt.factions || !!appendOpt.factionNames.trim()" aria-label="势力数" />
+        <button type="submit" class="cc-btn small primary" :disabled="!appendOpt.locations && !appendOpt.factions && !appendOpt.factionNames.trim()">生成</button>
+        <label class="append-names">
+          <span>指定势力名（每行一个；留空则随机生成）</span>
+          <textarea
+            v-model="appendOpt.factionNames"
+            class="gm-field"
+            rows="2"
+            placeholder="如：青云宗&#10;听雨楼"
+            aria-label="指定势力名"
+          ></textarea>
+        </label>
       </form>
     </div>
 
@@ -125,7 +135,7 @@
           <p class="gm-prose">{{ picked.description || picked.描述 }}</p>
           <dl class="gm-kv info-kv">
             <template v-if="leaderOf(picked)"><dt>首领</dt><dd>{{ leaderOf(picked)!.宗主 }}<small v-if="leaderOf(picked)!.宗主修为"> · {{ leaderOf(picked)!.宗主修为 }}</small></dd></template>
-            <template v-if="memberCountOf(picked)"><dt>成员</dt><dd>{{ memberCountOf(picked) }} 人</dd></template>
+            <template v-if="memberNamesOf(picked).length"><dt>主要成员</dt><dd>{{ memberNamesOf(picked).join('、') }}</dd></template>
             <template v-if="picked.与玩家关系"><dt>与你</dt><dd>{{ picked.与玩家关系 }}</dd></template>
           </dl>
           <div v-if="specialtiesOf(picked).length" class="chips"><span v-for="s in specialtiesOf(picked)" :key="s" class="gm-chip gold">{{ s }}</span></div>
@@ -226,14 +236,18 @@ const TYPE_NAMES: Record<string, string> = {
 const typeName = (t: string) => TYPE_NAMES[t] || t || '未知类型';
 const list = (v: unknown) => (Array.isArray(v) ? v.map(String) : typeof v === 'string' && v ? [v] : []);
 const leaderOf = (p: any) => p?.领导层 || p?.leadership || null;
-const memberCountOf = (p: any) => p?.成员数量?.总数 ?? p?.成员数量?.total ?? p?.memberCount?.total ?? null;
+const memberNamesOf = (p: any) => {
+  const raw = p?.主要成员 ?? p?.members;
+  if (!Array.isArray(raw)) return [];
+  return raw.map((m: any) => String(m?.名字 ?? m?.name ?? '').trim()).filter(Boolean).slice(0, 8);
+};
 const specialtiesOf = (p: any) => [...new Set([...list(p?.特色列表), ...list(p?.特色)])];
 
-// 势力判定：类型取自值域总表（唯一来源），并兼容依据领导层/成员数推断
+// 势力判定：类型取自值域总表（唯一来源），并兼容依据领导层/成员名单推断
 const isFaction = (l: any) =>
   (FACTION_TYPES as readonly string[]).includes(l?.类型) ||
   l?.type === 'sect_power' ||
-  !!(l?.leadership || l?.领导层 || l?.memberCount || l?.成员数量);
+  !!(l?.leadership || l?.领导层 || l?.主要成员);
 
 // ─── 画布 ───
 const canvasEl = ref<HTMLCanvasElement | null>(null);
@@ -432,11 +446,22 @@ const initialize = async () => {
 };
 
 const appendOpen = ref(false);
-const appendOpt = reactive({ locations: true, locationCount: 3, factions: false, factionCount: 1 });
+const appendOpt = reactive({ locations: true, locationCount: 3, factions: false, factionCount: 1, factionNames: '' });
 const append = async () => {
+  const names = appendOpt.factionNames.split(/[\n,，、]/).map((s) => s.trim()).filter(Boolean);
+  if (names.length > 5) {
+    toast.error('一次最多指定 5 个势力');
+    return;
+  }
   appendOpen.value = false;
   try {
-    const r = await gen.generateAdditional({ ...appendOpt });
+    const r = await gen.generateAdditional({
+      locations: appendOpt.locations,
+      locationCount: appendOpt.locationCount,
+      factions: appendOpt.factions || names.length > 0,
+      factionCount: appendOpt.factionCount,
+      factionNames: names,
+    });
     if (!r) return;
     renderData(true);
     toast.success(`已追加 ${[r.factions && `${r.factions} 个势力`, r.locations && `${r.locations} 个地点`].filter(Boolean).join('、') || '0 项'}`);
@@ -575,6 +600,23 @@ const addUnmapped = async (n: UnmappedNpc) => {
   width: 56px;
   height: 30px;
   text-align: center;
+}
+
+/* 指定势力名：独占一行 */
+.append-names {
+  display: flex !important;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3rem;
+  flex: 1 1 100%;
+  color: var(--cc-text-3);
+}
+
+.append-names textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
 }
 
 .badge {

@@ -8,7 +8,9 @@
  * 【设计原则】
  * - 专注于生成逻辑和字段定义
  * - 通用格式规则集中在 BASE_INSTRUCTION
+ * - 值域（灵根品级/倍率、技能消耗资源）一律引用 valueDomains 的常量，不在此另写一份
  */
+import { SPIRIT_ROOT_TIERS, SPIRIT_ROOT_MULTIPLIER, SKILL_RESOURCES } from '@/utils/prompts/definitions/valueDomains';
 
 
 // 基础指令
@@ -93,10 +95,10 @@ export const IMPROVED_SPIRIT_ROOT_PROMPT = `${BASE_INSTRUCTION}
 
 【字段】
 - name (字符串): 灵根名称，不含品级前缀（写"雷灵根"，不写"上品雷灵根"）
-- tier (字符串): 品级，只能是 凡品/下品/中品/上品/极品/仙品/神品 之一
+- tier (字符串): 品级，只能是 ${SPIRIT_ROOT_TIERS.join('/')} 之一
 - description (字符串): 50-200字
 - cultivation_speed (字符串): 修炼速度描述，格式"数字x"，与 base_multiplier 一致
-- base_multiplier (数字): 修炼倍率，参考 凡品1.0｜下品1.1｜中品1.3｜上品1.6｜极品2.0｜仙品2.4｜神品2.8
+- base_multiplier (数字): 修炼倍率，参考 ${SPIRIT_ROOT_TIERS.map((t) => `${t}${SPIRIT_ROOT_MULTIPLIER[t]}`).join('｜')}
 - special_effects (数组): 1-3 个特殊效果（字符串）
 - talent_cost (数字): 消耗天道点，参考 凡品0｜下品3｜中品6｜上品10｜极品15｜仙品20｜神品25
 - rarity (数字): 稀有度，1-10 的整数
@@ -152,7 +154,7 @@ export const IMPROVED_TECHNIQUE_PROMPT = `${BASE_INSTRUCTION}
 - "引气诀"这类基础功法名必须对应凡/黄品
 
 【技能消耗】
-- 只能用 灵气/神识/气血/寿元，写成百分比如"灵气15%"，寿元写"寿元5年"；禁止"精力/体力/能量"等其他资源
+- 只能用 ${SKILL_RESOURCES.join('/')}，写成百分比如"灵气15%"，寿元写"寿元5年"；禁止"精力/体力/能量"等其他资源
 - 示例：[{"技能名称":"基础剑气","技能描述":"凝聚灵力化作剑气攻敌","熟练度要求":0,"消耗":"灵气8%"},{"技能名称":"御剑术","技能描述":"以神识御使飞剑","熟练度要求":30,"消耗":"灵气12%+神识5%"}]
 `;
 

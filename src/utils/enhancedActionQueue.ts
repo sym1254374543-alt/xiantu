@@ -88,9 +88,8 @@ export class EnhancedActionQueueManager {
   private ensureRoleBackpack(saveData: SaveData): any {
     const anySave = saveData as any;
     if (!anySave.角色) anySave.角色 = {};
-    if (!anySave.角色.背包) anySave.角色.背包 = { 物品: {}, 灵石: { 下品: 0, 中品: 0, 上品: 0, 极品: 0 } };
+    if (!anySave.角色.背包) anySave.角色.背包 = { 物品: {} };
     if (!anySave.角色.背包.物品) anySave.角色.背包.物品 = {};
-    if (!anySave.角色.背包.灵石) anySave.角色.背包.灵石 = { 下品: 0, 中品: 0, 上品: 0, 极品: 0 };
     return anySave.角色.背包;
   }
 

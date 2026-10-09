@@ -177,23 +177,32 @@ export function guardEntityDomains(source: any, who = ''): void {
 }
 
 /**
- * 校验势力领导层的修为字段（世界.信息.势力信息 里的 宗主修为/最强修为）。
- * 这两处历史上出现过"练气初圆满"这类非法阶段。
+ * 校验势力里的修为字段（世界.信息.势力信息 的 领导层.宗主修为、主要成员[].境界）。
+ * 这些地方历史上出现过"练气初圆满"这类非法阶段。
  */
 export function guardFactionRealm(source: any, who = ''): boolean {
   const list = source?.世界?.信息?.势力信息
   if (!Array.isArray(list)) return false
   let changed = false
   for (const f of list) {
-    const L = f?.领导层
-    if (!L || typeof L !== 'object') continue
     const name = String(f?.名称 || '')
-    for (const field of ['宗主修为', '最强修为']) {
-      if (guardRealmValue(L, field, `${who}${name} `)) changed = true
+    const L = f?.领导层
+    if (L && typeof L === 'object') {
+      if (guardRealmValue(L, '宗主修为', `${who}${name} `)) changed = true
       // leadership（英文镜像字段）同步
       const mirror = f?.leadership
-      if (mirror && typeof mirror === 'object' && typeof mirror[field] === 'string') {
-        mirror[field] = L[field]
+      if (mirror && typeof mirror === 'object' && typeof mirror.宗主修为 === 'string') {
+        mirror.宗主修为 = L.宗主修为
+      }
+    }
+    // 主要成员的名字/职位/境界
+    const members = f?.主要成员
+    if (Array.isArray(members)) {
+      for (const m of members) {
+        if (!m || typeof m !== 'object') continue
+        if (typeof m.境界 === 'string' && m.境界) {
+          guardRealmValue(m, '境界', `${who}${name}·${m.名字 || '成员'} `)
+        }
       }
     }
   }

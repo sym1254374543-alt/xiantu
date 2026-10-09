@@ -60,6 +60,23 @@ export function detectPlayerSectLeadership(
     }
   }
 
+  // 1b. 势力档案的「主要成员」名单里，玩家是否挂着高层职位
+  for (const sect of sects) {
+    const members = (sect as any)?.主要成员;
+    if (!Array.isArray(members)) continue;
+    const me = members.find((m: any) => String(m?.名字 || '').trim() === playerName);
+    if (!me) continue;
+    const pos = String(me.职位 || '');
+    if (['宗主', '掌门', '副宗主', '副掌门'].includes(pos)) {
+      result.isLeader = true;
+      result.isMaster = ['宗主', '掌门'].includes(pos);
+      result.position = pos;
+      result.sectName = sect.名称;
+      result.sect = sect;
+      return result;
+    }
+  }
+
   // 2. 再检查 sectMemberInfo 的职位
   if (sectMemberInfo?.职位) {
     const pos = sectMemberInfo.职位;

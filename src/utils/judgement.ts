@@ -780,9 +780,9 @@ export function formatJudgementBlock(round: JudgementRound): string {
     return `- ${group.types.join('、')}: 判定值${group.value} (基础${group.base} + 环境${signed(group.env)} + 幸运${signed(round.幸运点)} + 状态${signed(round.状态修正)})`
   })
 
-  // 大道阶段说明
+  // 大道阶段说明（存档里的 当前阶段 是 0 基下标，对外称「第(n+1)阶」）
   const daoNote = round.大道信息 && round.大道信息.length > 0
-    ? `\n【大道修为】${round.大道信息.map(d => `${d.大道名}阶段${d.当前阶段}${d.阶段名称 ? '(' + d.阶段名称 + ')' : ''}`).join('、')}`
+    ? `\n【大道修为】${round.大道信息.map(d => `${d.大道名}第${d.当前阶段 + 1}阶${d.阶段名称 ? '(' + d.阶段名称 + ')' : ''}`).join('、')}`
     : ''
 
   // 能力加成说明（已计入上方基础值）

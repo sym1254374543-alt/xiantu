@@ -18,10 +18,8 @@
     </header>
 
     <div class="sp-stats">
-      <div v-if="memberTotal" class="stat"><span>成员</span><b>{{ memberTotal.toLocaleString('zh-CN') }}</b></div>
-      <div v-if="leadership?.综合战力" class="stat"><span>综合战力</span><b>{{ leadership.综合战力 }}</b></div>
+      <div v-if="members.length" class="stat"><span>主要成员</span><b>{{ members.length }}</b></div>
       <div v-if="sect.声望值 !== undefined" class="stat"><span>玩家声望</span><b>{{ reputationValue }}</b></div>
-      <div v-if="leadership?.最强修为" class="stat"><span>最强修为</span><b class="realm">{{ leadership.最强修为 }}</b></div>
     </div>
 
     <p v-if="sect.描述" class="gm-prose sp-desc">{{ sect.描述 }}</p>
@@ -39,19 +37,18 @@
         <template v-if="leadership.太上长老"><dt>太上长老</dt><dd>{{ leadership.太上长老 }}<small v-if="leadership.太上长老修为"> · {{ leadership.太上长老修为 }}</small></dd></template>
         <template v-if="leadership.圣女"><dt>圣女</dt><dd>{{ leadership.圣女 }}</dd></template>
         <template v-if="leadership.圣子"><dt>圣子</dt><dd>{{ leadership.圣子 }}</dd></template>
-        <template v-if="leadership.长老数量"><dt>长老</dt><dd>{{ leadership.长老数量 }} 位</dd></template>
       </dl>
     </section>
 
-    <section v-if="positionCounts.length" class="gm-section">
-      <h4 class="gm-label">成员构成</h4>
-      <div class="bars">
-        <div v-for="p in positionCounts" :key="p.name" class="bar">
-          <span>{{ p.name }}<small v-if="p.境界"> · {{ p.境界 }}</small></span>
-          <span class="bar-track"><span :style="{ width: p.percent + '%' }"></span></span>
-          <b>{{ p.count }}</b>
-        </div>
-      </div>
+    <section v-if="members.length" class="gm-section">
+      <h4 class="gm-label">主要成员</h4>
+      <ul class="roster">
+        <li v-for="m in members" :key="m.名字">
+          <b>{{ m.名字 }}</b>
+          <span class="roster-pos">{{ m.职位 }}</span>
+          <small v-if="m.境界">{{ m.境界 }}</small>
+        </li>
+      </ul>
     </section>
 
     <section v-if="territory.length || sect.势力范围详情?.影响范围" class="gm-section">
@@ -125,24 +122,17 @@ const specialties = computed(() => {
   return [...new Set(s.map(String).filter(Boolean))];
 });
 
-const count = computed<any>(() => props.sect.成员数量 || {});
-const memberTotal = computed(() => Number(count.value.总数 ?? count.value.total ?? 0) || 0);
-const positionCounts = computed(() => {
-  // 新结构：成员:[{名称,人数,境界}]；兼容旧的 按职位 映射
-  const tiers = count.value.成员 || count.value.职位;
-  let entries: { name: string; count: number; 境界: string }[];
-  if (Array.isArray(tiers)) {
-    entries = tiers
-      .map((t: any) => ({ name: String(t?.名称 || ''), count: Number(t?.人数) || 0, 境界: String(t?.境界 || '') }))
-      .filter((e) => e.name && e.count > 0);
-  } else {
-    const by = count.value.按职位 || count.value.byPosition || {};
-    entries = Object.entries(by as Record<string, number>)
-      .map(([name, n]) => ({ name, count: Number(n) || 0, 境界: '' }))
-      .filter((e) => e.count > 0);
-  }
-  const max = Math.max(1, ...entries.map((e) => e.count));
-  return entries.map((e) => ({ ...e, percent: Math.max(3, Math.round((e.count / max) * 100)) }));
+/** 具名成员名单（编制）。势力不再统计"多少人"，只列人名+职位+境界 */
+const members = computed<Array<{ 名字: string; 职位: string; 境界?: string }>>(() => {
+  const raw = (props.sect as any).主要成员 ?? (props.sect as any).members;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map((m: any) => ({
+      名字: String(m?.名字 ?? m?.name ?? '').trim(),
+      职位: String(m?.职位 ?? m?.position ?? '').trim() || '成员',
+      境界: String(m?.境界 ?? m?.realm ?? '').trim() || undefined,
+    }))
+    .filter((m) => !!m.名字);
 });
 
 const territory = computed(() => {
@@ -238,41 +228,35 @@ const resources = computed(() => {
   color: var(--cc-text-2);
 }
 
-.bars {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
+.roster {
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.bar {
-  display: grid;
-  grid-template-columns: 5.5em minmax(0, 1fr) 4em;
-  align-items: center;
+.roster li {
+  display: flex;
+  align-items: baseline;
   gap: 0.6rem;
-  font-size: 13px;
+  padding: 0.35rem 0;
+  border-bottom: 1px dashed var(--gm-line);
+  font-size: 14px;
+}
+
+.roster b {
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+.roster-pos {
+  font-size: 12px;
   color: var(--cc-text-2);
 }
 
-.bar b {
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  color: var(--cc-text);
-}
-
-.bar-track {
-  position: relative;
-  height: 6px;
-  border-radius: 3px;
-  background: var(--cc-inset);
-  overflow: hidden;
-}
-
-.bar-track > span {
-  position: absolute;
-  inset: 0 auto 0 0;
-  border-radius: inherit;
-  background: linear-gradient(90deg, rgba(var(--cc-gold-rgb), 0.4), var(--cc-gold));
+.roster small {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--cc-text-3);
 }
 
 .join {

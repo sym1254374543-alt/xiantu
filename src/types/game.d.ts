@@ -264,15 +264,19 @@ export interface MasteredSkill {
 }
 
 export interface Inventory extends AIMetadata {
-  灵石: {
+  /**
+   * @deprecated 灵石已不是货币（灵气复苏初期，修士以物易物）。
+   * 旧存档加载时会被迁移成 `物品` 里的「材料」，新代码不要再读写此字段。
+   */
+  灵石?: {
     下品: number;
     中品: number;
     上品: number;
     极品: number;
   };
   /**
-   * 新货币系统（可选，兼容旧存档）
-   * - key = 币种ID（建议：无点号`.`，例如：灵石_下品 / 人民币 / 美元）
+   * 货币系统（可选，兼容旧存档）
+   * - key = 币种ID（建议：无点号`.`，例如：人民币 / 美元 / 欧元）
    * - value = 币种结构体（包含价值度/数量/描述等）
    */
   货币?: Record<string, CurrencyAsset>;
@@ -284,14 +288,35 @@ export interface CurrencyAsset extends AIMetadata {
   币种: string; // 币种ID（建议与 key 一致）
   名称: string; // 展示名称
   数量: number; // 余额（整数为主，允许小数但建议避免）
-  价值度: number; // 相对“基准币种”的价值（默认以 1 下品灵石为 1）
+  价值度: number; // 体系内相对价值（现代货币以 1 人民币为 1）
   描述?: string;
-  图标?: string; // lucide 图标名，如：Gem / Coins / HandCoins / BadgeDollarSign
+  图标?: string; // lucide 图标名，如：Banknote / BadgeDollarSign / Euro
 }
 
 export interface CurrencySettings extends AIMetadata {
   禁用币种: string[]; // 用户删除过的币种ID（避免数据修复再次自动补回）
-  基准币种?: string; // 默认：灵石_下品
+  基准币种?: string; // 默认：人民币
+}
+
+/** 银行卡交易流水（只记最近若干条） */
+export interface BankTransaction {
+  时间: string; // 存档内时间描述，如「2026年3月5日 上午」
+  类型: '存入' | '取出' | '转账' | '收款' | '消费';
+  金额: number;
+  币种: string; // 币种ID，只允许现代货币
+  对方?: string; // 转账/收款对象
+  备注?: string;
+}
+
+/**
+ * 银行账户。与钱包（随身现金）分开：卡里的是存款，取出来才进钱包。
+ * `余额` 的 key 只允许现代货币 ID（人民币/美元/欧元）——灵石不是货币，不入卡。
+ */
+export interface BankCard {
+  卡号: string;
+  开户行: string;
+  余额: Record<string, number>;
+  交易记录?: BankTransaction[];
 }
 
 /** 功法中的技能信息 */
@@ -345,6 +370,17 @@ export interface SectMemberInfo {
   描述?: string;
 }
 
+/**
+ * 势力里的具名成员（编制）。该人物可能尚未在 社交.关系 建档。
+ * 与 社交.关系 的对应关系：按「名字」匹配。
+ */
+export interface FactionMember {
+  名字: string;
+  职位: string;
+  /** 修为境界，如"金丹后期"；不确定可省 */
+  境界?: string;
+}
+
 /** 宗门基础信息 */
 export interface SectInfo {
   名称: string; // 宗门名称
@@ -353,19 +389,17 @@ export interface SectInfo {
   位置?: string; // 总部位置
   描述: string; // 宗门描述
   特色: string[]; // 宗门特色
-  成员数量: SectMemberCount; // 成员数量统计
+  主要成员?: FactionMember[]; // 具名成员（编制）
   与玩家关系: SectRelationship; // 与玩家的关系
   声望: number; // 玩家在该宗门的声望
   可否加入: boolean; // 是否可以加入
   加入条件?: string[]; // 加入条件
   加入好处?: string[]; // 加入后的好处
-  // 新增：宗门领导和实力展示
+  // 宗门领导层：只保留「职位 → 姓名（+境界）」
   领导层?: {
     宗主: string; // 宗主姓名
     宗主修为: string; // 如"元婴后期"
     副宗主?: string; // 副宗主姓名（如有）
-    长老数量: number; // 长老总数
-    最强修为: string; // 宗门内最强修为
   };
   // 新增：简化的势力范围信息
   势力范围?: {
@@ -375,24 +409,10 @@ export interface SectInfo {
   };
 }
 
-/** 成员分层：一层职位对应一档境界，人数只有一个口径 */
-export interface SectMemberTier {
-  名称: string;   // 职位/身份，按势力类型取（局长/处长/专员、董事长/主管/职员……）
-  人数: number;
-  境界: string;   // 该层成员的大致修为（大境界或大境界+小阶段）
-}
-
 /**
- * 宗门成员构成。
- * 设计要点：**按职位分层，每层给境界**——只有一个「人数」口径，
- * 不再像旧版那样维护"按境界"与"按职位"两套独立统计并强求两者之和相等
- * （现实中它们是同一批人的两个切面，硬凑相等会产出无意义的数字）。
+ * 势力不再统计"多少人"：成员一律用 `WorldFaction.主要成员` 的具名名单。
+ * 旧的 成员数量/按境界/按职位 结构已废弃，由 sectDataValidator 在加载时清掉。
  */
-export interface SectMemberCount {
-  总数?: number; // 总成员数 = 各层人数之和
-  成员?: SectMemberTier[]; // 分层明细（权威结构）
-  职位?: SectMemberTier[]; // 别名，兼容 AI 可能写的键名
-}
 
 /** 宗门系统数据 */
 export interface SectSystemData extends AIMetadata {
@@ -437,7 +457,7 @@ export interface SectContentStatus {
 
 export interface SectManagementState extends AIMetadata {
   宗门名称: string;
-  战力?: number; // 0-100（默认与 宗门档案.领导层.综合战力 同口径）
+  战力?: number; // 0-100（势力档案已无「综合战力」字段，此处由 AI 依等级与宗主修为估计）
   安定?: number; // 0-100
   外门训练度?: number; // 0-100（用于战力与战损修正）
   府库?: {
@@ -720,10 +740,14 @@ export interface WorldFaction {
   // 宗门系统扩展字段 - 只对宗门类型势力有效
   特色列表?: string[]; // 宗门特色列表，替代 特色 字符串
 
-  // 宗门成员统计
-  成员数量?: SectMemberCount;
+  /**
+   * 具名成员（编制）。只写姓名+职位+境界，不再统计"多少人"。
+   * 与 社交.关系 里已登场的 NPC 按**名字**对应：名单里可以有人尚未登场，
+   * 登场后由 AI 在 社交.关系 建档并把 势力归属 设为本势力名。
+   */
+  主要成员?: FactionMember[];
 
-  // 宗门领导层 - 新增必需字段
+  // 宗门领导层：只保留「职位 → 姓名（+境界）」，不再放任何人数
   领导层?: {
     宗主: string;
     宗主修为: string; // 如"化神中期"、"元婴后期"等
@@ -732,12 +756,6 @@ export interface WorldFaction {
     圣子?: string;
     太上长老?: string;
     太上长老修为?: string;
-    长老数量?: number; // 宗门长老数量
-    最强修为: string; // 宗门内最高修为境界
-    综合战力?: number; // 1-100的综合战力评估
-    核心弟子数?: number;
-    内门弟子数?: number;
-    外门弟子数?: number;
   };
 
   // 势力范围详情
@@ -1042,11 +1060,14 @@ export interface NpcProfile {
 
   // === 资产物品 ===
   背包: {
-    灵石: { 下品: number; 中品: number; 上品: number; 极品: number };
+    /** @deprecated 灵石已不是货币；旧存档加载时会迁为 `物品` 里的「材料」 */
+    灵石?: { 下品: number; 中品: number; 上品: number; 极品: number };
     货币?: Record<string, CurrencyAsset>;
     货币设置?: CurrencySettings;
     物品: Record<string, Item>;
   };
+  /** 银行账户（可选：该 NPC 未必开户） */
+  银行?: BankCard;
 
   // === 可选模块 ===
   仪容?: SplendorProfile; // 酒馆端风华，与私密信息分开

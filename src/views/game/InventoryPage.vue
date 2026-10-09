@@ -159,7 +159,7 @@
         </p>
       </header>
 
-      <!-- 多体系分开列示：灵石与法币互不兑换，不做合并折算 -->
+      <!-- 多体系分开列示：旧存档遗留的废弃币种不与现代货币合并折算 -->
       <ul v-if="otherSystemTotals.length" class="system-totals">
         <li v-for="s in otherSystemTotals" :key="s.name">
           <span>{{ s.name }}体系</span>
@@ -169,8 +169,8 @@
 
       <EmptyState v-if="!wallet.rows.value.length" glyph="财" title="囊中羞涩" desc="还没有任何钱财" compact />
       <ul v-else class="coins">
-        <li v-for="row in wallet.rows.value" :key="row.id" class="coin" :class="{ stone: row.tier >= 0 }" :style="{ '--tier': row.tier }">
-          <span class="coin-mark"><Gem v-if="row.tier >= 0" :size="18" /><Coins v-else :size="18" /></span>
+        <li v-for="row in wallet.rows.value" :key="row.id" class="coin">
+          <span class="coin-mark"><Coins :size="18" /></span>
           <span class="coin-main">
             <b>{{ row.name }}</b>
             <small>{{ row.desc || `价值度 ${row.valueDegree}` }}</small>
@@ -207,6 +207,53 @@
         </li>
       </ul>
       <p class="wealth-note">兑换 = 用本币换一枚上一级（基准 100 : 1，手续费 2%）；分解 = 一枚拆成下一级。实际比例随所在地区市场倍率浮动，按钮悬停可看换算。</p>
+
+      <!-- 银行卡：存款与随身现金分开 -->
+      <section class="bank">
+        <header class="bank-head">
+          <span class="gm-label plain">银行卡</span>
+          <button v-if="!bank.hasCard.value" type="button" class="cc-btn small" :disabled="bankBusy" @click="openBankAccount">
+            <CreditCard :size="13" /><span>开户</span>
+          </button>
+        </header>
+
+        <p v-if="!bank.hasCard.value" class="bank-empty">尚未开户。办一张银行卡，把大额现金存进去更安全。</p>
+        <template v-else>
+          <p class="bank-card">
+            <CreditCard :size="16" />
+            <b>{{ bank.card.value?.卡号 }}</b>
+            <span>· {{ bank.card.value?.开户行 }}</span>
+          </p>
+          <ul class="coins">
+            <li v-for="row in bank.rows.value" :key="row.id" class="coin">
+              <span class="coin-mark"><Landmark :size="18" /></span>
+              <span class="coin-main">
+                <b>{{ row.name }}存款</b>
+                <small>随身现金 {{ formatNumber(bank.walletAmount(row.id)) }} {{ row.name }}</small>
+              </span>
+              <span class="coin-amount">
+                <b>{{ formatNumber(row.amount) }}</b>
+                <small>{{ row.name }}</small>
+              </span>
+              <span class="coin-ops">
+                <button type="button" class="cc-btn small" :disabled="bankBusy" @click="bankDeposit(row)">存入</button>
+                <button type="button" class="cc-btn small" :disabled="bankBusy" @click="bankWithdraw(row)">取出</button>
+                <button type="button" class="cc-btn small" :disabled="bankBusy" @click="bankTransfer(row)">转账</button>
+              </span>
+            </li>
+          </ul>
+
+          <details v-if="bank.transactions.value.length" class="bank-tx">
+            <summary>交易记录（{{ bank.transactions.value.length }}）</summary>
+            <ul>
+              <li v-for="(tx, i) in bank.transactions.value" :key="i">
+                <span>{{ tx.时间 }} · {{ tx.类型 }}{{ tx.对方 ? `（${tx.对方}）` : '' }}</span>
+                <b>{{ formatNumber(tx.金额) }} {{ tx.币种 }}</b>
+              </li>
+            </ul>
+          </details>
+        </template>
+      </section>
     </div>
   </div>
 </template>
@@ -214,7 +261,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import {
-  ArrowDown, ArrowUp, BookOpen, Coins, Flame, FlaskRound, Gem, MapPin, Package, Pause, RefreshCw, Search, Shield, ShieldOff,
+  ArrowDown, ArrowUp, BookOpen, Coins, CreditCard, Flame, FlaskRound, Gem, Landmark, MapPin, Package, Pause, RefreshCw, Search, Shield, ShieldOff,
   Sparkles, Sword, Trash2, Undo2,
 } from 'lucide-vue-next';
 import type { Item } from '@/types/game';
@@ -225,9 +272,10 @@ import { qualityTone, qualityKey } from '@/utils/qualityTone';
 import { flattenEffect, qualityLabel, techniqueProgress, toNumber } from '@/utils/gameDisplay';
 import { isTavernEnv } from '@/utils/tavern';
 import { useWallet } from '@/composables/useWallet';
+import { useBank } from '@/composables/useBank';
 import { currencySystemOf } from '@/utils/currencySystem';
 import { usePageActions } from '@/composables/usePageActions';
-import { askQuantity, confirmDialog } from '@/composables/useDialog';
+import { askQuantity, askText, confirmDialog } from '@/composables/useDialog';
 import PageTabs from '@/components/game/PageTabs.vue';
 import ListDetail from '@/components/game/ListDetail.vue';
 import EmptyState from '@/components/game/EmptyState.vue';
@@ -240,6 +288,7 @@ const gs = useGameStateStore();
 const characterStore = useCharacterStore();
 const queue = EnhancedActionQueueManager.getInstance();
 const wallet = useWallet();
+const bank = useBank();
 
 const allItems = computed<Item[]>(() =>
   Object.entries((gs.inventory as any)?.物品 || {})
@@ -315,7 +364,7 @@ const formatNumber = (n: number) => {
   return v >= 10000 ? `${(v / 10000).toFixed(v >= 100000 ? 1 : 2)}万` : v.toLocaleString('zh-CN');
 };
 
-/** 除基准体系外的其它货币体系合计（灵石与现代货币互不兑换，故分开列示） */
+/** 除基准体系外的其它货币体系合计（旧存档遗留的废弃币种不并入现代货币合计） */
 const otherSystemTotals = computed(() => {
   const baseSys = currencySystemOf(wallet.baseId.value);
   return Object.entries(wallet.totalsBySystem.value)
@@ -398,6 +447,62 @@ const removeCoin = async (id: string, name: string) => {
     await wallet.removeCurrency(id);
   } finally {
     coinBusy.value = false;
+  }
+};
+
+// ─── 银行卡 ───
+const bankBusy = ref(false);
+
+const openBankAccount = async () => {
+  const 开户行 = await askText({ title: '开户', label: '开户银行', defaultValue: '工商银行', placeholder: '如：工商银行' });
+  if (开户行 === null) return;
+  bankBusy.value = true;
+  try {
+    await bank.openAccount('', 开户行);
+  } finally {
+    bankBusy.value = false;
+  }
+};
+
+const bankDeposit = async (row: { id: string; name: string; amount: number }) => {
+  const cash = bank.walletAmount(row.id);
+  if (cash <= 0) return;
+  const n = await askQuantity({ title: '存入', itemName: row.name, max: cash, unit: row.name, maxLabel: '随身现金', confirmText: '存入' });
+  if (n === null) return;
+  bankBusy.value = true;
+  try {
+    const r = await bank.deposit(row.id, n);
+    if (!r.ok) await confirmDialog({ title: '无法存入', message: r.reason, confirmText: '知道了' });
+  } finally {
+    bankBusy.value = false;
+  }
+};
+
+const bankWithdraw = async (row: { id: string; name: string; amount: number }) => {
+  if (row.amount <= 0) return;
+  const n = await askQuantity({ title: '取出', itemName: row.name, max: row.amount, unit: row.name, maxLabel: '存款', confirmText: '取出' });
+  if (n === null) return;
+  bankBusy.value = true;
+  try {
+    const r = await bank.withdraw(row.id, n);
+    if (!r.ok) await confirmDialog({ title: '无法取出', message: r.reason, confirmText: '知道了' });
+  } finally {
+    bankBusy.value = false;
+  }
+};
+
+const bankTransfer = async (row: { id: string; name: string; amount: number }) => {
+  if (row.amount <= 0) return;
+  const target = await askText({ title: '转账', label: '收款人', placeholder: '必须是已认识的人（社交关系里的名字）' });
+  if (target === null) return;
+  const n = await askQuantity({ title: '转账', itemName: row.name, message: `转给「${target}」`, max: row.amount, unit: row.name, maxLabel: '存款', confirmText: '转账' });
+  if (n === null) return;
+  bankBusy.value = true;
+  try {
+    const r = await bank.transferTo(target, row.id, n);
+    if (!r.ok) await confirmDialog({ title: '无法转账', message: r.reason, confirmText: '知道了' });
+  } finally {
+    bankBusy.value = false;
   }
 };
 
@@ -755,7 +860,7 @@ usePageActions(() => [
   color: var(--cc-text-2);
 }
 
-/* 其它货币体系合计：灵石与法币互不兑换，分开列示 */
+/* 其它货币体系合计：旧存档遗留的废弃币种不并入现代货币合计，分开列示 */
 .system-totals {
   display: flex;
   flex-wrap: wrap;
@@ -804,11 +909,6 @@ usePageActions(() => [
   color: var(--cc-text-2);
 }
 
-.coin.stone .coin-mark {
-  background: color-mix(in srgb, var(--q-xuan) calc(8% + var(--tier) * 8%), transparent);
-  color: var(--q-xuan);
-}
-
 .coin-main,
 .coin-amount {
   display: flex;
@@ -850,6 +950,70 @@ usePageActions(() => [
   font-size: 13px;
   line-height: 1.7;
   color: var(--cc-text-3);
+}
+
+/* ---------- 银行卡 ---------- */
+.bank {
+  margin-top: 1.6rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--gm-line);
+}
+
+.bank-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.bank-empty {
+  margin: 0.8rem 0 0;
+  font-size: 13px;
+  color: var(--cc-text-3);
+}
+
+.bank-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.8rem 0 0.4rem;
+  font-size: 14px;
+  color: var(--cc-text-2);
+}
+
+.bank-card b {
+  letter-spacing: 0.1em;
+  color: var(--cc-gold);
+}
+
+.bank-tx {
+  margin-top: 0.8rem;
+  font-size: 13px;
+  color: var(--cc-text-3);
+}
+
+.bank-tx summary {
+  cursor: pointer;
+  padding: 0.3rem 0;
+}
+
+.bank-tx ul {
+  margin: 0.4rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bank-tx li {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.25rem 0;
+  border-bottom: 1px dashed var(--gm-line);
+}
+
+.bank-tx b {
+  color: var(--cc-text-2);
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 1100px) {

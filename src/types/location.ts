@@ -48,15 +48,8 @@ export interface WorldLocation {
     宗主修为?: string;
     [key: string]: any;
   };
-  memberCount?: {
-    total?: number;
-    [key: string]: any;
-  };
-  成员数量?: {
-    总数?: number;
-    total?: number;
-    [key: string]: any;
-  };
+  /** 势力的具名成员名单（编制） */
+  主要成员?: Array<{ 名字?: string; 职位?: string; 境界?: string; [key: string]: any }>;
 
   // 兼容旧数据（已废弃，仅用于数据迁移）
   x?: number;

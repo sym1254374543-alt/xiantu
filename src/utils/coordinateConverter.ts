@@ -42,7 +42,7 @@ const isKnownLocationType = (typeText: string) => Object.prototype.hasOwnPropert
 
 const isFactionLike = (loc: Record<string, any>, typeText: string) => {
   if (isKnownLocationType(typeText)) return false;
-  if (loc.leadership || loc.领导层 || loc.memberCount || loc.成员数量) return true;
+  if (loc.leadership || loc.领导层 || loc.主要成员) return true;
   return /(宗门|世家|商会|联盟|势力|妖族|魔道)/i.test(typeText);
 };
 

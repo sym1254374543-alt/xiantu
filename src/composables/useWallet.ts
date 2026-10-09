@@ -1,36 +1,28 @@
 /**
- * 钱包：新货币系统 inventory.货币 + 货币设置；旧 inventory.灵石 只做兼容同步。
+ * 钱包：inventory.货币 + 货币设置。
  * 汇率 = 价值度 × 所在地区市场倍率（worldInfo.经济.地区波动[地点].货币波动[币种]，夹在 0.6–1.6）。
  * 读是纯 computed；写都走「克隆 → 修改 → updateState 整体替换 → 存档」。
+ * 灵石已不是货币（转为背包「材料」），故钱包只剩现代货币一套体系。
  */
 import { computed } from 'vue';
 import { cloneDeep } from 'lodash';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { useCharacterStore } from '@/stores/characterStore';
-import { DEFAULT_BASE_CURRENCY_ID, DEFAULT_CURRENCIES, currencySystemOf, normalizeInventoryCurrencies, syncWalletToLegacySpiritStones } from '@/utils/currencySystem';
+import { DEFAULT_BASE_CURRENCY_ID, DEFAULT_CURRENCIES, currencySystemOf, normalizeInventoryCurrencies } from '@/utils/currencySystem';
 
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const num = (v: unknown, d = 0) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
 /**
  * 相邻面额：兑换 = 往上换，分解 = 往下拆，手续费 2%。
- * 兑换只在**同一体系内**进行（灵石⇄灵石、现代货币⇄现代货币），
- * 体系之间互不兑换——灵气复苏的地球上，凡人根本不知灵石为何物。
- * 面额比由价值度推导，故灵石（100）与现代货币（7.2）都能正确工作。
+ * 面额比由价值度推导（美元/人民币 = 7.2）。
  */
 const LADDER: Record<string, { up?: string; down?: string }> = {
-  灵石_下品: { up: '灵石_中品' },
-  灵石_中品: { up: '灵石_上品', down: '灵石_下品' },
-  灵石_上品: { up: '灵石_极品', down: '灵石_中品' },
-  灵石_极品: { down: '灵石_上品' },
   人民币: { up: '美元' },
   美元: { up: '欧元', down: '人民币' },
   欧元: { down: '美元' },
 };
-const ORDER = [
-  '灵石_下品', '灵石_中品', '灵石_上品', '灵石_极品',
-  '人民币', '美元', '欧元',
-];
+const ORDER = ['人民币', '美元', '欧元'];
 const FEE = 0.02;
 
 export interface CurrencyRow {
@@ -40,8 +32,6 @@ export interface CurrencyRow {
   desc: string;
   valueDegree: number;
   baseValue: number;
-  /** 灵石面额越高越亮 */
-  tier: number;
   up?: { to: string; toName: string; cost: number };
   down?: { to: string; toName: string; yield: number };
 }
@@ -87,15 +77,12 @@ export function useWallet() {
 
   /**
    * 折算为「本体系内的基准单位」（不跨体系）。
-   * 灵石体系基准=下品灵石；现代货币体系基准=人民币。
-   * 原先用全局基准币种折算，会把「1 元」和「1 下品灵石」算术相加，
-   * 违反「灵石与钱不互通」的设定。
+   * 现代货币体系基准 = 人民币；「其他」体系（旧存档遗留币种）以自身为基准，不混入合计。
    */
   const systemBaseOf = (id: string): string => {
     const sys = currencySystemOf(id)
-    if (sys === '灵石') return '灵石_下品'
     if (sys === '现代货币') return '人民币'
-    return id // 「其他」体系（旧存档遗留币种）以自身为基准，不混入任何体系
+    return id
   }
 
   const toBase = (id: string, amount: number) => {
@@ -110,7 +97,6 @@ export function useWallet() {
     return [...ORDER.filter((id) => ids.includes(id)), ...extra].map((id) => {
       const asset = wallet.value[id] || {};
       const amount = num(asset.数量);
-      const sys = currencySystemOf(id);
       const row: CurrencyRow = {
         id,
         name: nameOf(id),
@@ -118,7 +104,6 @@ export function useWallet() {
         desc: String(asset.描述 || ''),
         valueDegree: valueDegreeOf(id),
         baseValue: toBase(id, amount),
-        tier: ORDER.indexOf(id) >= 0 && sys === '灵石' ? ORDER.indexOf(id) : -1,
       };
       const pair = LADDER[id];
       const fromMult = multiplierOf(id);
@@ -169,7 +154,6 @@ export function useWallet() {
     if (!inv.货币设置 || typeof inv.货币设置 !== 'object') inv.货币设置 = { 禁用币种: [], 基准币种: DEFAULT_BASE_CURRENCY_ID };
     if (!Array.isArray(inv.货币设置.禁用币种)) inv.货币设置.禁用币种 = [];
     mutate(inv);
-    syncWalletToLegacySpiritStones(inv);
     gs.updateState('inventory', inv);
     if (mutateWorld && gs.worldInfo) {
       const world = cloneDeep(gs.worldInfo) as any;

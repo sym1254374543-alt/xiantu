@@ -14,7 +14,7 @@
 import type { GameTime, NpcProfile, SaveData } from '@/types/game';
 import type { TavernHelper } from '@/types';
 import { validateSaveDataV3 } from '@/utils/saveValidationV3';
-import { normalizeBackpackCurrencies } from '@/utils/currencySystem';
+import { normalizeBackpackCurrencies, migrateSpiritStonesToItems } from '@/utils/currencySystem';
 
 export function deepCleanForClone<T>(obj: T): T {
   return JSON.parse(JSON.stringify(obj));
@@ -35,21 +35,14 @@ export function validateAndFixSaveData(saveData: SaveData): SaveData {
   const anySave = saveData as any;
   if (!anySave.角色 || typeof anySave.角色 !== 'object') anySave.角色 = {};
   if (!anySave.角色.背包 || typeof anySave.角色.背包 !== 'object') {
-    anySave.角色.背包 = {
-      灵石: { 下品: 0, 中品: 0, 上品: 0, 极品: 0 },
-      物品: {}
-    };
+    anySave.角色.背包 = { 物品: {} };
   }
 
   if (!anySave.角色.背包.物品 || typeof anySave.角色.背包.物品 !== 'object') {
     anySave.角色.背包.物品 = {};
   }
 
-  if (!anySave.角色.背包.灵石 || typeof anySave.角色.背包.灵石 !== 'object') {
-    anySave.角色.背包.灵石 = { 下品: 0, 中品: 0, 上品: 0, 极品: 0 };
-  }
-
-  // 兼容旧存档 + 新货币系统兜底
+  // 兼容旧存档 + 新货币系统兜底 + 灵石迁出货币转为材料
   normalizeBackpackCurrencies(anySave.角色.背包);
 
   // 清理无效的物品数据
@@ -282,18 +275,15 @@ export function validateAndRepairNpcProfile(npcData: unknown, gameTime?: GameTim
     // 4. 结构检查与修复 (背包) - 防御性处理
     try {
       if (typeof repairedNpc.背包 !== 'object' || repairedNpc.背包 === null) {
-        repairedNpc.背包 = { 灵石: { 下品: 0, 中品: 0, 上品: 0, 极品: 0 }, 物品: {} };
-      } else {
-        if (typeof repairedNpc.背包.灵石 !== 'object' || repairedNpc.背包.灵石 === null) {
-          repairedNpc.背包.灵石 = { 下品: 0, 中品: 0, 上品: 0, 极品: 0 };
-        }
-        if (typeof repairedNpc.背包.物品 !== 'object' || repairedNpc.背包.物品 === null) {
-          repairedNpc.背包.物品 = {};
-        }
+        repairedNpc.背包 = { 物品: {} };
+      } else if (typeof repairedNpc.背包.物品 !== 'object' || repairedNpc.背包.物品 === null) {
+        repairedNpc.背包.物品 = {};
       }
+      // NPC 也不再持有灵石货币：旧的 背包.灵石 迁为背包「材料」物品
+      migrateSpiritStonesToItems(repairedNpc.背包);
     } catch (e) {
       console.warn('[NPC校验] 背包字段修复失败，使用默认值:', e);
-      repairedNpc.背包 = { 灵石: { 下品: 0, 中品: 0, 上品: 0, 极品: 0 }, 物品: {} };
+      repairedNpc.背包 = { 物品: {} };
     }
 
     // 5. 确保实时关注是布尔值

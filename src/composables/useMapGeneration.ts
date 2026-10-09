@@ -11,6 +11,7 @@ import { generateRegionMap, type RegionNpcLocationHint } from '@/utils/worldGene
 import { buildHehuanSaintess, HEHUAN_NPC_NAME } from '@/data/easterEggNpcs';
 import { realmRank } from '@/utils/realmOrder';
 import { isTavernEnv } from '@/utils/tavern';
+import { findNameMentions } from '@/utils/memoryLookup';
 import { num, parseLocationPath, type WorldMapData } from './useWorldMapData';
 
 export type MapDensity = 'sparse' | 'normal' | 'dense';
@@ -97,19 +98,52 @@ export function useMapGeneration(data: WorldMapData) {
     }
   };
 
+  /**
+   * 在记忆/事件/叙事里找这些名字出现过的片段，供 AI 把新势力写得与剧情一致。
+   * 用字面匹配（向量检索依赖 Embedding，未配置时查不到东西）。
+   * 存档只深拷贝一次，供所有名字共用。
+   */
+  const loreOf = (names: string[]): Map<string, string[]> => {
+    const out = new Map<string, string[]>();
+    if (!names.length) return out;
+    try {
+      const save = gs.toSaveData?.();
+      if (!save) return out;
+      for (const n of names) {
+        out.set(n, findNameMentions(n, save as any).map((m) => `${m.来源}：${m.文本}`));
+      }
+    } catch (e) {
+      console.warn('[地图] 检索势力相关记忆失败（非致命）:', e);
+    }
+    return out;
+  };
+
   /** 追加生成：在现有基础上补地点 / 势力，避开已有名称与坐标 */
-  const generateAdditional = async (opt: { locations: boolean; locationCount: number; factions: boolean; factionCount: number }) => {
+  const generateAdditional = async (opt: {
+    locations: boolean;
+    locationCount: number;
+    factions: boolean;
+    factionCount: number;
+    /** 指定势力名（「按名字追加」）：给了名字就按名字生成，忽略 factionCount */
+    factionNames?: string[];
+  }) => {
     const wi = data.getCurrentWorldInfo() as any;
     if (!wi) throw new Error('未找到世界信息');
-    if (!opt.locations && !opt.factions) throw new Error('请至少选择一种生成类型');
+    const names = (opt.factionNames || []).map((n) => String(n).trim()).filter(Boolean);
+    const wantFactions = opt.factions || names.length > 0;
+    if (!opt.locations && !wantFactions) throw new Error('请至少选择一种生成类型');
     busy.value = 'append';
     try {
-      const egg = opt.factions && isTavernEnv() && Math.random() < 0.3;
+      const egg = wantFactions && !names.length && isTavernEnv() && Math.random() < 0.3;
+      const lore = loreOf(names);
+      const requiredFactions = names.length
+        ? names.map((n) => ({ 名称: n, 史实: lore.get(n) || [] }))
+        : undefined;
       const result = await new EnhancedWorldGenerator({
         worldName: wi.世界名称,
         worldBackground: wi.世界背景,
         worldEra: wi.世界纪元 || '修真盛世',
-        factionCount: opt.factions ? opt.factionCount : 0,
+        factionCount: names.length || (wantFactions ? opt.factionCount : 0),
         locationCount: opt.locations ? opt.locationCount : 0,
         secretRealmsCount: 0,
         continentCount: wi.大陆信息?.length || 1,
@@ -117,6 +151,7 @@ export function useMapGeneration(data: WorldMapData) {
         maxRetries: 2,
         retryDelay: 500,
         enableHehuanEasterEgg: egg,
+        requiredFactions,
         existingFactions: (wi.势力信息 || []).map((f: any) => ({ 名称: f.名称 || f.name, 位置: f.位置 || f.location, 势力范围: f.势力范围 || f.territory })),
         existingLocations: (wi.地点信息 || []).map((l: any) => ({ 名称: l.名称 || l.name, coordinates: l.coordinates || l.坐标 })),
         // 大洲不会重新生成，必须把既有边界喂给 AI——否则它另排一套网格摆新势力，势力会落到错误的洲

@@ -97,7 +97,7 @@ const leaders = computed(() => {
 const leaderSummary = computed(() => {
   const l = ctx.leadership.value;
   if (!l) return '';
-  return [l.长老数量 && `长老 ${l.长老数量} 位`, l.最强修为 && `最强 ${l.最强修为}`, l.综合战力 && `战力 ${l.综合战力}`].filter(Boolean).join(' · ');
+  return [`共 ${ctx.members.value.length} 人`].filter(Boolean).join(' · ');
 });
 
 const cat = ref<'all' | '高层' | '真传' | '内门' | '外门'>('all');

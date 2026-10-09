@@ -2,6 +2,7 @@
  * 地图生成彩蛋：酒馆环境下随机生成合欢宗时附带的人物（原先在 GameMapPanel 里写了两遍，这里合成一份）。
  */
 import type { GameTime, NpcProfile } from '@/types/game';
+import { buildSpiritStoneItems } from '@/utils/currencySystem';
 
 export const HEHUAN_NPC_NAME = '灰夫人(合欢圣女)';
 
@@ -36,7 +37,7 @@ export function buildHehuanSaintess(sectName: string, gameTime: GameTime | null 
     ],
     当前外貌状态: "衣衫半解，媚眼如丝",
     当前内心想法: "观察着周围的人，寻找能让我感兴趣的猎物",
-    背包: { 灵石: { 下品: 5000, 中品: 500, 上品: 50, 极品: 0 }, 物品: {} },
+    背包: { 物品: buildSpiritStoneItems({ 下品: 5000, 中品: 500, 上品: 50 }) },
     实时关注: true,
     私密信息: {
       是否为处女: true,

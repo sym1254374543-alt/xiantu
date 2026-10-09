@@ -987,7 +987,7 @@ export const useCharacterStore = defineStore('characterV3', () => {
         try {
           const saveData = await storage.loadSaveData(charId, slotKey);
           if (saveData) {
-            console.log('[15] 从IndexedDB加载的角色.背包.灵石数据:', (saveData as any).角色?.背包?.灵石)
+            console.log('[15] 从IndexedDB加载的现金/银行数据:', (saveData as any).角色?.背包?.货币, (saveData as any).角色?.银行)
             targetSlot.存档数据 = saveData;
             debug.log('角色商店', `✅ 已从 IndexedDB 加载存档数据`);
           } else {
@@ -1456,7 +1456,6 @@ export const useCharacterStore = defineStore('characterV3', () => {
         throw new Error('无法生成存档数据，游戏状态不完整。');
       }
 
-      console.log('[11] toSaveData()返回的角色.背包.灵石数据:', (currentSaveData as any).角色?.背包?.灵石)
 
       // 2. 自动更新年龄、技能等派生数据
       updateLifespanFromGameTime(currentSaveData);
@@ -1493,7 +1492,8 @@ export const useCharacterStore = defineStore('characterV3', () => {
       console.log('[12] 即将保存到IndexedDB的数据:', {
         角色ID: active.角色ID,
         存档槽位: active.存档槽位,
-        背包灵石: (currentSaveData as any).角色?.背包?.灵石
+        现金: (currentSaveData as any).角色?.背包?.货币,
+        银行卡: (currentSaveData as any).角色?.银行,
       })
 
       // 3. 🔥 核心变更：将巨大的SaveData独立保存到IndexedDB

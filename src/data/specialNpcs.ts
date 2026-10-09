@@ -1,4 +1,5 @@
 import type { GameTime, NpcProfile, WorldInfo } from '@/types/game';
+import { buildSpiritStoneItems } from '@/utils/currencySystem';
 
 export type SpecialNpcSceneTag =
   | 'earth'
@@ -72,7 +73,7 @@ export const SPECIAL_NPCS: SpecialNpcDefinition[] = [
       记忆: [],
       当前外貌状态: '戴着黑框眼镜和口罩，半扎狼尾，黑发间若隐若现桃粉色发尾。',
       当前内心想法: '（又是平静的一天…希望不要被发现异常。）',
-      背包: { 灵石: { 下品: 100, 中品: 20, 上品: 5, 极品: 0 }, 物品: {} },
+      背包: { 物品: buildSpiritStoneItems({ 下品: 100, 中品: 20, 上品: 5 }) },
       实时关注: false,
       私密信息: {
         是否为处女: true,
