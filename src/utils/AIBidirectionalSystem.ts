@@ -21,6 +21,7 @@ import { updateStatusEffects } from './statusEffectManager';
 import { sanitizeAITextForDisplay } from '@/utils/textSanitizer';
 import { validateAndRepairNpcProfile } from '@/utils/dataValidation';
 import { stripNsfwContent } from '@/utils/prompts/definitions/dataDefinitions';
+import { toPromptState } from '@/utils/aiPromptState';
 import { RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS, NARRATIVE_PURITY_RULES } from '@/utils/prompts/definitions/coreRules';
 import { isSaveDataV3, migrateSaveDataToLatest } from './saveMigration';
 import { parseJsonSmart } from '@/utils/jsonExtract';
@@ -658,7 +659,8 @@ class AIBidirectionalSystemClass {
         };
       };
 
-      const stateJsonString = JSON.stringify(buildNarrativeState());
+      // 发给 AI 前剥掉纯冗余的英文镜像键（不动 stateForAI 本身：判定/关注NPC等还在用它）
+      const stateJsonString = JSON.stringify(toPromptState(buildNarrativeState()));
 
       const activePrompts: string[] = [];
       if (actionOptionsEnabled) {

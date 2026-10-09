@@ -16,7 +16,7 @@ import { cloneDeep } from 'lodash';
 import { isSaveDataV3, migrateSaveDataToLatest } from '@/utils/saveMigration';
 import { validateSaveDataV3 } from '@/utils/saveValidationV3';
 import { normalizeBackpackCurrencies, migrateSpiritStonesToItems, normalizeBankCard } from '@/utils/currencySystem';
-import { guardEntityDomains } from '@/utils/valueGuard';
+import { guardEntityDomains, guardFactionRealm } from '@/utils/valueGuard';
 
 /**
  * 修复并清洗存档数据，确保所有必需字段存在且格式正确
@@ -76,6 +76,8 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
     // 值域守卫：灵根品阶纠正 + 物品品质/品级校验 + 大道阶段校验
     // （不纠正的项写入诊断，手机端可在设置→运行诊断查看）
     guardEntityDomains(repaired, '玩家');
+    // 势力修为守卫：历史上出现过「金丹初圆满」这类不存在的阶段，会污染 AI 对势力上限的判断
+    guardFactionRealm(repaired);
 
     // --- 属性 ---
     if (!repaired.角色.属性 || typeof repaired.角色.属性 !== 'object') {
