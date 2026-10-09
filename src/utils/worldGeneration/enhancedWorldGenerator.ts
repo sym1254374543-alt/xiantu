@@ -239,7 +239,7 @@ export class EnhancedWorldGenerator {
         worldName: this.config.worldName,
         mapConfig: this.config.mapConfig
       };
-      let defaultPrompt = EnhancedWorldPromptBuilder.buildPrompt(promptConfig);
+      const defaultPrompt = EnhancedWorldPromptBuilder.buildPrompt(promptConfig);
 
       // 🔥 注入合欢宗要求
       // 注入块单独累积：它们是"本次生成的世界事实约束"，与提示词风格无关，
