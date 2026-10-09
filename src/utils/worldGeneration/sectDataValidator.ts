@@ -115,7 +115,12 @@ function normalizeLeadership(sectData: any): void {
 }
 
 /**
- * 验证并修复势力数据
+ * 验证并修复**单个**势力数据。
+ *
+ * ⚠️**本函数直接修改传入的对象**（就地修复）。
+ * 传进来的如果是 store / 响应式对象，就会把修改写回 store ——
+ * 若调用点位于 computed 内，会造成无限重算（宗门页卡死事故的成因）。
+ * 所以：**调用方必须先深拷贝**，或改用下面的 validateAndFixSectDataList。
  */
 export function validateAndFixSectRealmData(sectData: any): any {
   if (!sectData) return sectData;
