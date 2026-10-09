@@ -7,6 +7,7 @@
  * 不再参与任何推算（历史上它曾反向覆盖权威值并批量污染过 7 个势力）。
  */
 
+import { cloneDeep } from 'lodash';
 import { FACTION_RANKS } from '@/utils/prompts/definitions/valueDomains';
 
 // 境界等级映射 - 支持带"期"和不带"期"的格式
@@ -184,13 +185,20 @@ export function validateSectConsistency(sectData: any): { isValid: boolean; erro
 }
 
 /**
- * 批量验证并修复势力数据列表
+ * 批量验证并修复势力数据列表。
+ *
+ * ⚠️**不修改传入的对象**，逐项深拷贝后再修复。
+ * 原因：本函数会被 `useSectContext.allSects` 这个 **computed** 调用，而入参就是
+ * store 里的活数组。若在 computed 求值过程中写回 reactive 状态，computed 会被
+ * 自己失效并不断重算 —— 页面直接卡死。
+ * （归一化里会给 `主要成员` 赋一个新数组，数组引用每次都变，所以更早那版
+ *  "写一次就稳定"的校验器没暴露这个问题，改成具名名单后就踩到了。）
  */
 export function validateAndFixSectDataList(sects: any[]): any[] {
   if (!Array.isArray(sects)) return sects;
 
   return sects.map(sect => {
-    const fixedSect = validateAndFixSectRealmData(sect);
+    const fixedSect = validateAndFixSectRealmData(cloneDeep(sect));
     const validation = validateSectConsistency(fixedSect);
 
     if (!validation.isValid) {
