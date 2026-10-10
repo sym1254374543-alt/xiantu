@@ -408,13 +408,18 @@ ${lines.join('\n')}`;
         const factionName = String(faction.name || faction.名称 || '');
         const isHehuan = factionName.includes('合欢');
 
+        // 每个具名职位都要带修为（提示词用 副手修为，旧数据可能写 副宗主修为）
+        const deputyRealm = rawLeadership?.副手修为 ?? rawLeadership?.副宗主修为;
         const leadership = rawLeadership
           ? {
               宗主: leaderName,
               宗主修为: leaderRealm,
               副宗主: deputyName ?? undefined,
+              副宗主修为: deputyRealm ?? undefined,
               圣女: isHehuan ? (rawLeadership.圣女 ?? undefined) : undefined,
+              圣女修为: isHehuan ? (rawLeadership.圣女修为 ?? undefined) : undefined,
               圣子: isHehuan ? (rawLeadership.圣子 ?? undefined) : undefined,
+              圣子修为: isHehuan ? (rawLeadership.圣子修为 ?? undefined) : undefined,
               太上长老: rawLeadership.太上长老 ?? undefined,
               太上长老修为: rawLeadership.太上长老修为 ?? undefined,
             }

@@ -33,10 +33,10 @@
       <h4 class="gm-label">领导层</h4>
       <dl class="gm-kv">
         <dt>{{ leaderTitle }}</dt><dd>{{ leadership.首领 ?? leadership.宗主 }}<small v-if="leaderRealm"> · {{ leaderRealm }}</small></dd>
-        <template v-if="deputyName"><dt>{{ deputyTitle }}</dt><dd>{{ deputyName }}</dd></template>
+        <template v-if="deputyName"><dt>{{ deputyTitle }}</dt><dd>{{ deputyName }}<small v-if="leadership.副宗主修为"> · {{ leadership.副宗主修为 }}</small></dd></template>
         <template v-if="leadership.太上长老"><dt>太上长老</dt><dd>{{ leadership.太上长老 }}<small v-if="leadership.太上长老修为"> · {{ leadership.太上长老修为 }}</small></dd></template>
-        <template v-if="leadership.圣女"><dt>圣女</dt><dd>{{ leadership.圣女 }}</dd></template>
-        <template v-if="leadership.圣子"><dt>圣子</dt><dd>{{ leadership.圣子 }}</dd></template>
+        <template v-if="leadership.圣女"><dt>圣女</dt><dd>{{ leadership.圣女 }}<small v-if="leadership.圣女修为"> · {{ leadership.圣女修为 }}</small></dd></template>
+        <template v-if="leadership.圣子"><dt>圣子</dt><dd>{{ leadership.圣子 }}<small v-if="leadership.圣子修为"> · {{ leadership.圣子修为 }}</small></dd></template>
       </dl>
     </section>
 

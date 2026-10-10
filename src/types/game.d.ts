@@ -400,6 +400,7 @@ export interface SectInfo {
     宗主: string; // 宗主姓名
     宗主修为: string; // 如"元婴后期"
     副宗主?: string; // 副宗主姓名（如有）
+    副宗主修为?: string;
   };
   // 新增：简化的势力范围信息
   势力范围?: {
@@ -752,8 +753,11 @@ export interface WorldFaction {
     宗主: string;
     宗主修为: string; // 如"化神中期"、"元婴后期"等
     副宗主?: string;
+    副宗主修为?: string; // 每个具名职位都应带修为，与 宗主修为/太上长老修为 同构
     圣女?: string;
+    圣女修为?: string;
     圣子?: string;
+    圣子修为?: string;
     太上长老?: string;
     太上长老修为?: string;
   };

@@ -152,6 +152,26 @@ export function guardTechniqueSkill(item: any, who = ''): boolean {
 }
 
 /**
+ * 无门无派的**凡人**，势力归属应写「凡人」而不是「散修」。
+ * （「散修」的前提是有修为、只是没有门派；凡人没有修为，谈不上散修。）
+ * 只在境界**明确是凡人**时才改，境界缺失时不猜。
+ * @returns 是否发生了纠正
+ */
+export function guardNpcFactionAffiliation(npc: any, who = ''): boolean {
+  if (!npc || typeof npc !== 'object') return false
+  if (String(npc.势力归属 || '').trim() !== '散修') return false
+
+  const realm = npc.境界
+  const realmName = typeof realm === 'string' ? realm.trim() : (typeof realm?.名称 === 'string' ? realm.名称.trim() : '')
+  if (realmName !== '凡人') return false
+
+  npc.势力归属 = '凡人'
+  diag.warn('值域·势力归属', `${who}是无门无派的凡人，「势力归属」由"散修"改为"凡人"`,
+    '散修=有修为但无门无派；没有修为的凡人直接写"凡人"')
+  return true
+}
+
+/**
  * 校验物品品质（不改值，只报问题）
  */
 export function guardItemQuality(item: any, who = ''): boolean {
@@ -262,6 +282,9 @@ export function guardEntityDomains(source: any, who = ''): void {
   const daoList = source.角色?.大道?.大道列表
   if (daoList) guardDaoStages(daoList, who)
 
+  // NPC：无门无派的凡人，势力归属写"凡人"而非"散修"（玩家对象上没有该字段，天然跳过）
+  guardNpcFactionAffiliation(source, who)
+
   // 功法装备标记
   guardTechniqueEquip(source, who)
 }
@@ -278,7 +301,10 @@ export function guardFactionRealm(source: any, who = ''): boolean {
     const name = String(f?.名称 || '')
     const L = f?.领导层
     if (L && typeof L === 'object') {
-      if (guardRealmValue(L, '宗主修为', `${who}${name} `)) changed = true
+      // 领导层里每个具名职位都应带修为，一并校验
+      for (const field of ['宗主修为', '副宗主修为', '太上长老修为', '圣女修为', '圣子修为'] as const) {
+        if (guardRealmValue(L, field, `${who}${name} `)) changed = true
+      }
       // leadership（英文镜像字段）同步
       const mirror = f?.leadership
       if (mirror && typeof mirror === 'object' && typeof mirror.宗主修为 === 'string') {

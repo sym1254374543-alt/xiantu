@@ -89,7 +89,7 @@ const leaders = computed(() => {
   if (!l) return [];
   const out: { role: string; name: string; realm: string; verb: string; text: string }[] = [];
   if (l.宗主) out.push({ role: '宗主', name: l.宗主, realm: l.宗主修为 || '', verb: '拜见', text: SECT_CHAT_TEXTS.visitMaster(sect, l.宗主) });
-  if (l.副宗主) out.push({ role: '副宗主', name: l.副宗主, realm: '', verb: '请教', text: SECT_CHAT_TEXTS.askVice(sect, l.副宗主) });
+  if (l.副宗主) out.push({ role: '副宗主', name: l.副宗主, realm: l.副宗主修为 || '', verb: '请教', text: SECT_CHAT_TEXTS.askVice(sect, l.副宗主) });
   if (l.太上长老) out.push({ role: '太上长老', name: l.太上长老, realm: l.太上长老修为 || '', verb: '拜见', text: SECT_CHAT_TEXTS.visitElder(sect, l.太上长老) });
   return out;
 });

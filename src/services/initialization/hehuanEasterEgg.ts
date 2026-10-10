@@ -33,6 +33,8 @@ export function applyHehuanSectEasterEgg(worldInfo: WorldInfo, saveData: SaveDat
       nextLeadership.圣女 = '灰夫人(合欢圣女)';
       console.log('[角色初始化] ✅ 已补齐合欢宗领导层：圣女=灰夫人(合欢圣女)');
     }
+    // 每个具名职位都要带修为（与灰夫人 NPC 档案的境界一致：金丹圆满）
+    if (!nextLeadership.圣女修为) nextLeadership.圣女修为 = '金丹圆满';
 
     (hehuanSect as any).领导层 = nextLeadership;
     (hehuanSect as any).leadership = nextLeadership;

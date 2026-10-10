@@ -101,6 +101,9 @@ function normalizeLeadership(sectData: any): void {
     L.副手 = deputyName;
     L.副宗主 = deputyName;
   }
+  // 副手修为：只留一个权威键（世界生成提示词用「副手修为」，契约用「副宗主修为」）
+  if (L.副宗主修为 === undefined && typeof L.副手修为 === 'string') L.副宗主修为 = L.副手修为;
+  delete L.副手修为;
   // 供界面显示该势力应有的首领称谓（财团=董事长、家族=家主……）
   L.首领称谓 = leaderTitle;
   L.副手称谓 = deputyTitle;
