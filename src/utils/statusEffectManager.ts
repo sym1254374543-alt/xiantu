@@ -180,7 +180,12 @@ export function normalizeStatusEffect(effect: LegacyStatusEffect, gameTime: Game
       来源: effect.来源 || effect.source
     };
 
-    if (effect.剩余时间) {
+    // ⚠️ 顺序要紧：**显式给了 持续时间分钟 就保留**（-1 / ≥99999 表示"持续到被解除"，
+    // 见 isStatusEffectExpired）。此前只有"同时给了生成时间"才保留，于是"伪装/易容"
+    // 这类常态状态会在 60 游戏分钟后被自动清掉——这是"状态写不进/留不住"的主因。
+    if (typeof effect.持续时间分钟 === 'number') {
+      normalizedEffect.持续时间分钟 = effect.持续时间分钟;
+    } else if (effect.剩余时间) {
       normalizedEffect.持续时间分钟 = parseDurationToMinutes(effect.剩余时间);
     } else if (effect.duration) {
       normalizedEffect.持续时间分钟 = parseDurationToMinutes(effect.duration);

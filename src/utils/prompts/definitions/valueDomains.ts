@@ -220,8 +220,7 @@ export function renderValueDomainsPrompt(): string {
 
 [灵根品级]7个等级:${rootTiers};另有"特殊"(异变标记,非等级,如天妒之体)
  修炼倍率参考:${rootMult}
- 灵根名与品级分开写:名字写"金灵根""混沌灵根",品级另填
- ❌禁止把物品品质当灵根品级:没有"黄品灵根""地品灵根""天品灵根"
+ 灵根名与品级分开写:名字只写灵根本身(如"冰灵根""混沌灵根"),品级从上表7个里另填一个
  分布参考:凡人~练气多凡品~中品;筑基~金丹多中品~上品;元婴多极品;仙品/神品极罕,一个大陆不应扎堆
 
 [物品/功法品质]7个等级:${ITEM_QUALITIES.join(' < ')};品级取0-10整数(${ITEM_GRADE_RANGES.map(g => `${g.range}=${g.name}`).join(',')})
@@ -253,7 +252,7 @@ export function renderValueDomainsPrompt(): string {
 [物品类型]只能是:${ITEM_TYPES.join('|')}
 
 [技能消耗]资源名只能是:${SKILL_RESOURCES.map(r => r === '寿元' ? '寿元(禁术,写"寿元5年")' : r).join('|')}
- 写成百分比如"灵气15%";❌禁止精力/体力/能量等其他名目
+ 写成百分比如"灵气15%";只能用上面四项,不要另立名目
 
 [势力]类型:${FACTION_TYPES.join('|')};等级:${FACTION_LEVELS.join('|')};与玩家关系:${FACTION_RELATIONS.join('|')}
  开局可生成(新兴):${FACTION_TYPES_INITIAL.join('|')}
@@ -263,7 +262,6 @@ export function renderValueDomainsPrompt(): string {
  ⚠️类型与命名必须一致,不要把两种形态揉在一起:
   家族世家→"XX家族/XX氏"(血脉为纽)｜财团企业→"XX集团/XX公司/XX财团"(资本为纽)
   官方机构→"XX局/XX署/XX委员会"｜研究所学院→"XX研究所/XX研究院/XX大学"｜教团结社→"XX教/XX会/XX社"
-  ❌不要出现"某某安防集团"却标成"家族世家"——家族的核心是血脉,不是公司
  职位按类型区分(不要把宗主/长老套到财团):
 ${Object.entries(FACTION_RANKS).map(([t, r]) => `  ${t}: 首领=${r.首领}|副手=${r.副手}|骨干=${r.骨干}|成员=${r.成员}`).join('\n')}
 

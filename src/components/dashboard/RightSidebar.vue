@@ -105,19 +105,29 @@
           <ChevronDown v-if="statusEffects.length" :size="14" class="fold-caret" :class="{ shut: statusCollapsed }" />
         </button>
         <div v-if="statusEffects.length" v-show="!statusCollapsed" class="effects">
-          <button
+          <div
             v-for="(effect, index) in statusEffects"
             :key="effect.状态名称 || `effect-${index}`"
-            type="button"
-            class="effect"
-            :class="isBuff(effect) ? 'buff' : 'debuff'"
-            :title="effect.状态描述 || ''"
-            @click="showStatusDetail(effect)"
+            class="effect-row"
           >
-            <span class="effect-mark">{{ isBuff(effect) ? t('增') : t('减') }}</span>
-            <span class="effect-name">{{ effect.状态名称 || '未知状态' }}</span>
-            <span v-if="formatTimeDisplay(effect.时间)" class="effect-time">{{ formatTimeDisplay(effect.时间) }}</span>
-          </button>
+            <button
+              type="button"
+              class="effect"
+              :class="isBuff(effect) ? 'buff' : 'debuff'"
+              :title="effect.状态描述 || ''"
+              @click="showStatusDetail(effect)"
+            >
+              <span class="effect-mark">{{ isBuff(effect) ? t('增') : t('减') }}</span>
+              <span class="effect-name">{{ effect.状态名称 || '未知状态' }}</span>
+              <span v-if="formatTimeDisplay(effect.时间)" class="effect-time">{{ formatTimeDisplay(effect.时间) }}</span>
+            </button>
+            <button
+              type="button"
+              class="effect-clear"
+              :title="`解除「${effect.状态名称 || '未知状态'}」`"
+              @click="removeEffect(effect)"
+            >解除</button>
+          </div>
         </div>
       </section>
     </div>
@@ -145,12 +155,27 @@ import type { StatusEffect } from '@/types/game.d.ts';
 import { formatRealmWithStage } from '@/utils/realmUtils';
 import { calculateAgeFromBirthdate } from '@/utils/lifespanCalculator';
 import { useI18n } from '@/i18n';
+import { useStatusEffects } from '@/composables/useStatusEffects';
+import { toast } from '@/utils/toast';
 
 const { t } = useI18n();
 
 
 const gameStateStore = useGameStateStore();
 const uiStore = useUIStore();
+const { removeByName } = useStatusEffects();
+
+/** 手动解除一条状态（AI 忘了解除时的兜底） */
+const removeEffect = async (effect: StatusEffect) => {
+  const name = String(effect?.状态名称 || '').trim();
+  if (!name) return;
+  try {
+    await removeByName(name);
+    toast.success(`已解除「${name}」`);
+  } catch (e) {
+    toast.error(`解除失败：${e instanceof Error ? e.message : '未知错误'}`);
+  }
+};
 
 // 数据加载状态
 const isDataLoaded = computed(() => gameStateStore.isGameLoaded && !!gameStateStore.character);
@@ -342,7 +367,7 @@ const showStatusDetail = (effect: StatusEffect) => {
   uiStore.showDetailModal({
     title: effect.状态名称,
     component: StatusDetailCard,
-    props: { effect }
+    props: { effect, onRemove: () => { uiStore.hideDetailModal(); void removeEffect(effect); } }
   });
 };
 
@@ -816,5 +841,35 @@ const getReputationClass = (): string => {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   color: var(--cc-text-3);
+}
+
+/* 一条状态 = 可点开详情的签条 + 手动「解除」（AI 忘了解除时的兜底） */
+.effect-row {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.effect-row .effect {
+  flex: 1;
+  min-width: 0;
+}
+
+.effect-clear {
+  flex-shrink: 0;
+  height: 32px;
+  padding: 0 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--cc-text-3) 30%, transparent);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--cc-text-3);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.effect-clear:hover {
+  color: var(--cc-danger);
+  border-color: color-mix(in srgb, var(--cc-danger) 50%, transparent);
 }
 </style>

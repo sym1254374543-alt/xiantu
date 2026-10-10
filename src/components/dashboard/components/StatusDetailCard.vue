@@ -37,6 +37,10 @@
           <div class="item-value time">{{ formatGenerationTime(effect.生成时间) }}</div>
         </div>
       </div>
+
+      <button v-if="onRemove" type="button" class="card-remove" @click="onRemove()">
+        解除此状态
+      </button>
     </div>
   </div>
 </template>
@@ -47,6 +51,8 @@ import type { StatusEffect, GameTime } from '@/types/game';
 
 const props = defineProps<{
   effect: StatusEffect;
+  /** 手动解除（由 RightSidebar 传入；不传则不显示解除按钮） */
+  onRemove?: () => void;
 }>();
 
 const isBuff = computed(() => String(props.effect.类型).toLowerCase() === 'buff');
@@ -72,7 +78,8 @@ const strengthColor = computed(() => {
 const durationDisplay = computed(() => {
   const duration = props.effect.持续时间分钟;
   if (duration === undefined || duration === null) return '';
-  if (duration === 99999) return '永久';
+  // -1 / ≥99999 = 持续到被解除（易容、隐身、伪装成凡人这类"当前形态"用这个）
+  if (duration < 0 || duration >= 99999) return '持续中（至解除）';
   if (duration >= 1440) return `${Math.floor(duration / 1440)}天`;
   if (duration >= 60) {
     const hours = Math.floor(duration / 60);
@@ -240,5 +247,21 @@ const formatGenerationTime = (time: GameTime) => {
   .strength { margin-bottom: 0.1rem; }
   .strength-text { font-size: 0.85rem; }
   .strength-value { font-size: 0.65rem; }
+}
+
+.card-remove {
+  align-self: flex-start;
+  padding: 0.4rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--cc-danger) 40%, transparent);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cc-danger);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.card-remove:hover {
+  background: color-mix(in srgb, var(--cc-danger) 12%, transparent);
 }
 </style>

@@ -11,6 +11,7 @@
 
 import {
   SPIRIT_ROOT_ALL_TIERS,
+  SPIRIT_ROOT_TIERS,
   ITEM_QUALITIES,
   DAO_STAGE_COUNT,
   REALMS,
@@ -29,12 +30,56 @@ const QUALITY_TO_ROOT_TIER_PINYIN: Record<string, string> = {
 }
 
 /**
- * 纠正灵根品级（就地修改 holder.灵根.品级 / .tier）
+ * 把揉进灵根名里的品级词拆出来。
+ * AI 会写出「太阴极品冰灵根·极品」这类名字（品级混在名字里，`formatSpiritRoot`
+ * 会把整串当名字显示）。这里把品级词从名字里剥掉，并回填到品级字段。
+ * 只比对 `SPIRIT_ROOT_TIERS`（7 个品级），不动「特殊」这类异变标记，
+ * 也不会误伤「太阴」这类道名。
+ * @returns 是否发生了纠正
+ */
+function stripTierFromSpiritRootName(root: any, who: string): boolean {
+  const nameKey = (['名称', 'name'] as const).find((k) => typeof root[k] === 'string')
+  if (!nameKey) return false
+  const original = String(root[nameKey]).trim()
+  if (!original) return false
+
+  let name = original
+  const found: string[] = []
+  // ① 尾巴形式：「冰灵根·极品」「冰灵根（极品）」「冰灵根 极品」
+  for (const t of SPIRIT_ROOT_TIERS) {
+    const tail = new RegExp(`[\\s·・().,，、\\-—]${t}[)）]?$`)
+    while (tail.test(name)) {
+      found.push(t)
+      name = name.replace(tail, '').trim()
+    }
+  }
+  // ② 内嵌形式：「太阴极品冰灵根」
+  for (const t of SPIRIT_ROOT_TIERS) {
+    if (name.includes(t)) {
+      found.push(t)
+      name = name.split(t).join('')
+    }
+  }
+  name = name.trim()
+  if (!found.length || !name) return false
+
+  const tierKey = (['品级', 'tier', '品阶'] as const).find((k) => k in root) || '品级'
+  root[nameKey] = name
+  if (!isValidSpiritRootTier(root[tierKey])) root[tierKey] = found[found.length - 1]
+  diag.warn('值域·灵根', `${who}灵根名「${original}」混入了品级，已拆分为 名「${name}」/ 品级「${root[tierKey]}」`,
+    `名字只写灵根本身（如"冰灵根"），品级另填；合法品级：${SPIRIT_ROOT_ALL_TIERS.join('/')}`)
+  return true
+}
+
+/**
+ * 纠正灵根品级与灵根名（就地修改 holder.灵根.品级 / .tier / .名称）
  * @returns 是否发生了纠正
  */
 export function guardSpiritRootTier(holder: any, who = ''): boolean {
   const root = holder?.灵根
   if (!root || typeof root !== 'object') return false
+
+  let changed = stripTierFromSpiritRootName(root, who)
 
   for (const key of ['品级', 'tier'] as const) {
     const raw = root[key]
@@ -58,9 +103,52 @@ export function guardSpiritRootTier(holder: any, who = ''): boolean {
       diag.warn('值域·灵根', `${who}灵根品级「${tier}」无法识别，已按「中品」兜底`,
         `合法值：${SPIRIT_ROOT_ALL_TIERS.join('/')}`)
     }
-    return true
+    changed = true
+    break
   }
-  return false
+  return changed
+}
+
+/** 功法技能里可能被 AI 自造的"名字"键（契约只有 技能名称） */
+const TECHNIQUE_SKILL_NAME_ALIASES = ['技能名', '技能光华', '名称', 'name'] as const
+/** 系统兜底生成的占位技能名：`${功法名}·招式N` */
+const PLACEHOLDER_SKILL_NAME = /·招式\d+$/
+
+/**
+ * 纠正功法技能的名字字段（就地修改）。
+ * AI 会把真名写在非契约键上（实测出现过 `技能光华`），导致契约键缺失、被兜底成
+ * 「某某·招式1」；而 掌握技能 / 已解锁技能 都从 `技能名称` 派生，于是整条链都显示占位符。
+ * @returns 是否发生了纠正
+ */
+export function guardTechniqueSkill(item: any, who = ''): boolean {
+  if (!item || typeof item !== 'object') return false
+  const skills = item.功法技能
+  if (!Array.isArray(skills)) return false
+
+  let changed = false
+  for (const sk of skills) {
+    if (!sk || typeof sk !== 'object') continue
+    const aliasKey = TECHNIQUE_SKILL_NAME_ALIASES.find(
+      (k) => typeof sk[k] === 'string' && String(sk[k]).trim(),
+    )
+    const current = typeof sk.技能名称 === 'string' ? sk.技能名称.trim() : ''
+    const aliasName = aliasKey ? String(sk[aliasKey]).trim() : ''
+
+    if (aliasName && (!current || PLACEHOLDER_SKILL_NAME.test(current))) {
+      sk.技能名称 = aliasName
+      diag.warn('值域·功法技能', `${who}功法「${item.名称 || ''}」的技能名取自非契约键「${aliasKey}」，已归一到 技能名称`,
+        `技能名="${aliasName}"；契约键只有 技能名称/技能描述/熟练度要求/消耗`)
+      changed = true
+    }
+    // 清掉自造键，避免下次再被当成真名
+    for (const k of TECHNIQUE_SKILL_NAME_ALIASES) {
+      if (k in sk) {
+        delete sk[k]
+        changed = true
+      }
+    }
+  }
+  return changed
 }
 
 /**
@@ -165,7 +253,9 @@ export function guardEntityDomains(source: any, who = ''): void {
   const bag = source.角色?.背包?.物品 ?? source.背包?.物品
   if (bag && typeof bag === 'object') {
     for (const item of Object.values(bag as Record<string, any>)) {
-      if (item && typeof item === 'object') guardItemQuality(item, who)
+      if (!item || typeof item !== 'object') continue
+      guardItemQuality(item, who)
+      if (item.类型 === '功法') guardTechniqueSkill(item, who)
     }
   }
 

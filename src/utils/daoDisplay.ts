@@ -13,11 +13,41 @@ export const DAO_CATEGORIES = [
   { key: 'other', label: '其他' },
 ];
 
+/**
+ * 关键字 → 分类。**顺序即优先级**（`daoCategory` 取第一个命中的），
+ * 所以长词/易冲突的必须排在单字前面：
+ * 与提示词 `THREE_THOUSAND_DAOS_RULES` 的命名分类对应 ——
+ * 意境类→法则、元素类→自然、武器类→战斗、职业类+修炼类→修行。
+ *
+ * ⚠️ 曾漏掉单字 `器`（表里只写了双字 `炼器`，而 `"器道".includes("炼器")` 为假），
+ * 导致「器道」长期显示为「其他」；同批补上 棍/医/药/毒/体/魂/神/法/术/生死/阴阳/五行/时空/红尘。
+ */
 const KEYWORD_CATEGORY: Record<string, string> = {
-  剑: 'combat', 刀: 'combat', 拳: 'combat', 枪: 'combat', 戟: 'combat',
-  金: 'nature', 木: 'nature', 水: 'nature', 火: 'nature', 土: 'nature', 风: 'nature', 雷: 'nature', 冰: 'nature', 雪: 'nature',
-  因果: 'concept', 轮回: 'concept', 时间: 'concept', 空间: 'concept', 命运: 'concept',
-  丹: 'cultivation', 炼器: 'cultivation', 阵: 'cultivation', 符: 'cultivation',
+  // 意境类（先匹配，避免被后面的单字元素/武器抢走）
+  五行: 'concept', 阴阳: 'concept', 时空: 'concept', 时间: 'concept', 空间: 'concept',
+  因果: 'concept', 轮回: 'concept', 命运: 'concept', 生死: 'concept', 红尘: 'concept',
+  虚空: 'concept', 混沌: 'concept', 缘: 'concept', 情: 'concept', 梦: 'concept',
+  // 元素/自然
+  金: 'nature', 木: 'nature', 水: 'nature', 火: 'nature', 土: 'nature',
+  风: 'nature', 雷: 'nature', 冰: 'nature', 雪: 'nature', 霜: 'nature',
+  光: 'nature', 暗: 'nature', 星: 'nature', 月: 'nature', 日: 'nature',
+  山: 'nature', 海: 'nature', 云: 'nature', 林: 'nature', 花: 'nature',
+  // 武器/战斗
+  剑: 'combat', 刀: 'combat', 枪: 'combat', 戟: 'combat', 棍: 'combat', 棒: 'combat',
+  鞭: 'combat', 弓: 'combat', 弩: 'combat', 拳: 'combat', 掌: 'combat', 腿: 'combat', 爪: 'combat',
+  战: 'combat', 杀: 'combat',
+  // 职业类 + 修炼类
+  炼器: 'cultivation', 器: 'cultivation', 丹: 'cultivation', 阵: 'cultivation', 符: 'cultivation',
+  医: 'cultivation', 药: 'cultivation', 毒: 'cultivation',
+  体: 'cultivation', 魂: 'cultivation', 神: 'cultivation', 法: 'cultivation', 术: 'cultivation',
+};
+
+/** 提示词用的命名分类标签 → 本文件的分类 key（AI 若写了 `分类` 也能对上） */
+const DECLARED_CATEGORY_ALIAS: Record<string, string> = {
+  武器类: 'combat', 战斗类: 'combat',
+  职业类: 'cultivation', 修炼类: 'cultivation', 修行类: 'cultivation',
+  意境类: 'concept', 法则类: 'concept',
+  自然类: 'nature',
 };
 
 export function daoCategory(name: string, dao?: Partial<DaoData> | null): string {
@@ -25,6 +55,8 @@ export function daoCategory(name: string, dao?: Partial<DaoData> | null): string
   if (declared) {
     const hit = DAO_CATEGORIES.find((c) => c.key === declared || c.label === declared);
     if (hit) return hit.key;
+    const alias = DECLARED_CATEGORY_ALIAS[String(declared).trim()];
+    if (alias) return alias;
   }
   for (const [kw, cat] of Object.entries(KEYWORD_CATEGORY)) if (name.includes(kw)) return cat;
   return 'other';

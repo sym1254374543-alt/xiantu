@@ -593,10 +593,16 @@ class AIBidirectionalSystemClass {
 
         const effects = (stateForAI.角色?.效果 ?? []) as StatusEffect[];
         if (Array.isArray(effects) && effects.length > 0) {
-          coreStatusSummary += `\n- 效果: ${effects
+          // 带上"持续到解除"的标记与状态描述：像「伪装成凡人」这种，光给名字
+          // AI 不知道伪装成了什么样，就没法据此叙事或判定是否被识破。
+          coreStatusSummary += `\n- 当前状态(每回合叙事必须以此为前提): ${effects
             .filter((e: StatusEffect) => e && typeof e === 'object' && e.状态名称)
-            .map((e: StatusEffect) => e.状态名称)
-            .join(', ')}`;
+            .map((e: StatusEffect) => {
+              const perpetual = typeof e.持续时间分钟 === 'number' && (e.持续时间分钟 < 0 || e.持续时间分钟 >= 99999);
+              const desc = typeof e.状态描述 === 'string' && e.状态描述.trim() ? `：${e.状态描述.trim()}` : '';
+              return `${e.状态名称}${perpetual ? '(持续中,至解除)' : ''}${desc}`;
+            })
+            .join('; ')}`;
         }
       }
       if (character?.天赋) {
@@ -2274,13 +2280,24 @@ ${saveDataJson}`, role: 'system', depth: 4, position: 'in_chat' },
     repaired.功法技能 = repaired.功法技能
       .filter((s: any) => s && typeof s === 'object')
       .map((s: any, idx: number) => {
+        // 契约键是 技能名称；AI 偶尔把真名写在自造键上（实测出现过 技能光华），
+        // 那种情况下若直接兜底，真名会被「某某·招式1」占位符顶掉，且 掌握技能 /
+        // 已解锁技能 都从 技能名称 派生 → 整条链都显示占位符。
+        const aliasName = ['技能名', '技能光华', '名称', 'name']
+          .map((k) => (typeof s[k] === 'string' ? s[k].trim() : ''))
+          .find((v) => !!v);
+        const declared = typeof s.技能名称 === 'string' ? s.技能名称.trim() : '';
         const skillName =
-          typeof s.技能名称 === 'string' && s.技能名称.trim() ? s.技能名称.trim() : `${techniqueName}·招式${idx + 1}`;
+          (declared && !/·招式\d+$/.test(declared) ? declared : aliasName) ||
+          declared ||
+          `${techniqueName}·招式${idx + 1}`;
         const skillDescription = typeof s.技能描述 === 'string' ? s.技能描述 : '';
         const unlockThreshold =
           typeof s.熟练度要求 === 'number' && Number.isFinite(s.熟练度要求) ? s.熟练度要求 : 0;
         const cost = typeof s.消耗 === 'string' ? s.消耗 : '';
-        return { ...s, 技能名称: skillName, 技能描述: skillDescription, 熟练度要求: unlockThreshold, 消耗: cost };
+        const cleaned = { ...s };
+        for (const k of ['技能名', '技能光华', '名称', 'name']) delete cleaned[k];
+        return { ...cleaned, 技能名称: skillName, 技能描述: skillDescription, 熟练度要求: unlockThreshold, 消耗: cost };
       });
 
     if (repaired.功法技能.length === 0) {
