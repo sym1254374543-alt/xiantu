@@ -136,6 +136,10 @@ export const useUIStore = defineStore('ui', () => {
   const enableActionOptions = ref(localStorage.getItem('enableActionOptions') !== 'false'); // 默认开启
   const actionOptionsPrompt = ref(localStorage.getItem('actionOptionsPrompt') || ''); // 自定义行动选项提示词
 
+  // 📝 [玩家笔记] 玩家随手写的设定/偏好/剧情走向；每回合随系统提示词高优先级发送给 AI
+  const playerNotes = ref(localStorage.getItem('playerNotes') || '');
+  const enablePlayerNotes = ref(localStorage.getItem('enablePlayerNotes') !== 'false'); // 默认开启
+
   // 🛡️ [指令/存档保护强度] 控制 AI 指令校验与保护力度
   // - strict: 严格校验 + 保护（更安全）
   // - skeleton: 仅保护存档骨干结构/记忆/系统自动字段（更自由，但更容易生成脏数据）
@@ -638,6 +642,20 @@ export const useUIStore = defineStore('ui', () => {
       set: (val) => {
         actionOptionsPrompt.value = val;
         localStorage.setItem('actionOptionsPrompt', val);
+      }
+    }),
+    playerNotes: computed({
+      get: () => playerNotes.value,
+      set: (val) => {
+        playerNotes.value = val;
+        localStorage.setItem('playerNotes', val);
+      }
+    }),
+    enablePlayerNotes: computed({
+      get: () => enablePlayerNotes.value,
+      set: (val) => {
+        enablePlayerNotes.value = val;
+        localStorage.setItem('enablePlayerNotes', String(val));
       }
     }),
 

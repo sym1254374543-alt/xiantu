@@ -16,7 +16,7 @@ import { cloneDeep } from 'lodash';
 import { isSaveDataV3, migrateSaveDataToLatest } from '@/utils/saveMigration';
 import { validateSaveDataV3 } from '@/utils/saveValidationV3';
 import { normalizeBackpackCurrencies, migrateSpiritStonesToItems, normalizeBankCard } from '@/utils/currencySystem';
-import { guardEntityDomains, guardFactionRealm } from '@/utils/valueGuard';
+import { guardEntityDomains, guardFactionRealm, guardWorldLocationFields } from '@/utils/valueGuard';
 
 /**
  * 修复并清洗存档数据，确保所有必需字段存在且格式正确
@@ -78,6 +78,8 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
     guardEntityDomains(repaired, '玩家');
     // 势力修为守卫：历史上出现过「金丹初圆满」这类不存在的阶段，会污染 AI 对势力上限的判断
     guardFactionRealm(repaired);
+    // 地点守卫：AI 写过「极度危险」「一般」这类值域外的安全等级/开放状态，会让地图配色与图例对不上
+    guardWorldLocationFields(repaired);
 
     // --- 属性 ---
     if (!repaired.角色.属性 || typeof repaired.角色.属性 !== 'object') {
@@ -162,6 +164,8 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
         if (playerName && finalName === playerName) continue;
 
         npc.名字 = finalName;
+        // 银行卡只属于玩家：旧存档里 NPC 的 银行 一律剔除，资产全在 背包.货币
+        delete npc.银行;
         validNpcs[finalName] = repairNpc(npc as NpcProfile);
       }
 

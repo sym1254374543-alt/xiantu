@@ -210,6 +210,17 @@
               <div v-if="currencies.length" class="coins">
                 <span v-for="c in currencies" :key="c.name" class="gm-chip gold">{{ c.name }} {{ c.amount }}</span>
               </div>
+              <div v-if="npcAssets.length" class="npc-assets">
+                <h4 class="gm-label">财产</h4>
+                <ul class="gm-list">
+                  <li v-for="a in npcAssets" :key="a.类别 + a.名称" class="gm-row">
+                    <span class="gm-row-main">
+                      <span class="gm-row-title">{{ a.名称 }}</span>
+                      <span class="gm-row-sub">{{ a.类别 }}<template v-if="a.类型"> · {{ a.类型 }}</template><template v-if="a.估值"> · 约 {{ formatAmount(a.估值) }} {{ a.币种 || '人民币' }}</template><template v-if="a.备注"> · {{ a.备注 }}</template></span>
+                    </span>
+                  </li>
+                </ul>
+              </div>
               <ul v-if="npcItems.length" class="gm-list">
                 <li v-for="it in npcItems" :key="it.物品ID || it.名称" class="gm-row bag-row">
                   <span class="gm-row-main">
@@ -223,7 +234,7 @@
                   </span>
                 </li>
               </ul>
-              <p v-else-if="!currencies.length" class="gm-muted">身无长物。</p>
+              <p v-else-if="!currencies.length && !npcAssets.length" class="gm-muted">身无长物。</p>
             </template>
 
             <!-- 私密 -->
@@ -268,7 +279,7 @@ import { useRoute } from 'vue-router';
 import {
   BookUp, ChevronLeft, ChevronRight, Download, EyeOff, FileDown, HandHelping, Handshake, Loader2, Pencil, Search, Sparkles, Star, Trash2,
 } from 'lucide-vue-next';
-import type { NpcProfile } from '@/types/game';
+import type { NpcProfile, AssetProfile } from '@/types/game';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { formatRealmWithStage } from '@/utils/realmUtils';
 import { spiritRootTone } from '@/utils/qualityTone';
@@ -399,6 +410,32 @@ const currencies = computed(() => {
   const wallet = bag.货币 && typeof bag.货币 === 'object' ? Object.values(bag.货币) : [];
   return wallet.filter((c) => toNumber(c?.数量) > 0).map((c) => ({ name: c.名称 || c.币种, amount: toNumber(c.数量) }));
 });
+
+/** 非货币财产：房产 / 车辆 / 持股 / 其他 */
+const npcAssets = computed(() => {
+  const a = selected.value?.资产 as AssetProfile | undefined;
+  if (!a || typeof a !== 'object') return [];
+  const groups: (keyof AssetProfile)[] = ['房产', '车辆', '持股', '其他'];
+  const out: { 类别: string; 名称: string; 类型?: string; 估值?: number; 币种?: string; 备注?: string }[] = [];
+  for (const key of groups) {
+    const list = a[key];
+    if (!Array.isArray(list)) continue;
+    for (const it of list) {
+      if (!it || typeof it !== 'object' || !it.名称) continue;
+      out.push({
+        类别: String(key),
+        名称: String(it.名称),
+        类型: it.类型 ? String(it.类型) : undefined,
+        估值: Number(it.估值) > 0 ? Number(it.估值) : undefined,
+        币种: it.币种 ? String(it.币种) : undefined,
+        备注: it.备注 ? String(it.备注) : undefined,
+      });
+    }
+  }
+  return out;
+});
+
+const formatAmount = (n: number) => n.toLocaleString('zh-CN');
 
 const npcSplendor = computed(() => splendorFromNpc(selected.value));
 

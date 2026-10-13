@@ -18,6 +18,10 @@ import {
   REALM_STAGES,
   isValidSpiritRootTier,
   isValidItemQuality,
+  SAFETY_LEVELS,
+  SAFETY_LEVEL_ALIASES,
+  OPEN_STATUSES,
+  OPEN_STATUS_ALIASES,
 } from '@/utils/prompts/definitions/valueDomains'
 import { diag } from '@/utils/diagnostics'
 
@@ -287,6 +291,53 @@ export function guardEntityDomains(source: any, who = ''): void {
 
   // 功法装备标记
   guardTechniqueEquip(source, who)
+}
+
+/**
+ * 地点「安全等级 / 开放状态」归一化。
+ * AI 实际写过「极度危险」「一般」这类值域外的值，会让地图配色/图例与类型对不上。
+ * 有别名映射的就近纠正；识别不了的只报问题，不猜。
+ * @returns 是否发生了纠正
+ */
+export function guardWorldLocationFields(source: any): boolean {
+  const list = source?.世界?.信息?.地点信息
+  if (!Array.isArray(list)) return false
+  let changed = false
+
+  for (const loc of list) {
+    if (!loc || typeof loc !== 'object') continue
+    const name = String(loc.名称 || '地点')
+
+    const rawSafety = typeof loc.安全等级 === 'string' ? loc.安全等级.trim() : ''
+    if (rawSafety && !(SAFETY_LEVELS as readonly string[]).includes(rawSafety)) {
+      const fixed = SAFETY_LEVEL_ALIASES[rawSafety]
+      if (fixed) {
+        loc.安全等级 = fixed
+        diag.warn('值域·安全等级', `地点「${name}」安全等级"${rawSafety}"→"${fixed}"`,
+          `合法值：${SAFETY_LEVELS.join('/')}`)
+        changed = true
+      } else {
+        diag.warn('值域·安全等级', `地点「${name}」安全等级"${rawSafety}"不在值域内`,
+          `合法值：${SAFETY_LEVELS.join('/')}`)
+      }
+    }
+
+    const rawOpen = typeof loc.开放状态 === 'string' ? loc.开放状态.trim() : ''
+    if (rawOpen && !(OPEN_STATUSES as readonly string[]).includes(rawOpen)) {
+      const fixed = OPEN_STATUS_ALIASES[rawOpen]
+      if (fixed) {
+        loc.开放状态 = fixed
+        diag.warn('值域·开放状态', `地点「${name}」开放状态"${rawOpen}"→"${fixed}"`,
+          `合法值：${OPEN_STATUSES.join('/')}`)
+        changed = true
+      } else {
+        diag.warn('值域·开放状态', `地点「${name}」开放状态"${rawOpen}"不在值域内`,
+          `合法值：${OPEN_STATUSES.join('/')}`)
+      }
+    }
+  }
+
+  return changed
 }
 
 /**

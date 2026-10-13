@@ -18,7 +18,8 @@ import type {
   WorldInfo,
   EventSystem,
   BodyStats,
-  BankCard
+  BankCard,
+  AssetProfile
 } from '@/types/game';
 
 /**
@@ -117,6 +118,8 @@ export interface SaveDataV3 {
     身体?: BodyStats;
     /** 银行账户（可选：角色可能还没开户） */
     银行?: BankCard;
+    /** 非货币财产（房产/车辆/持股/其他，可选） */
+    资产?: AssetProfile;
     背包: Inventory;
     装备: Equipment;
     功法: TechniqueSystemV3;

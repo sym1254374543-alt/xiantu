@@ -268,6 +268,20 @@
               ></textarea>
             </div>
 
+            <div class="row stacked">
+              <div class="row-info">
+                <label class="row-name" for="setting-player-notes">{{ t('玩家笔记') }}</label>
+                <span class="row-desc">{{ t('你自己写的设定 / 偏好 / 剧情要求。每回合以最高优先级发给 AI，可随时改，用来随手纠偏') }}</span>
+              </div>
+              <textarea
+                id="setting-player-notes"
+                v-model="uiStore.playerNotes"
+                class="field area"
+                :placeholder="t('例如：剧情多写日常与职场，少写打斗；主角不会主动杀人；把我同事写成隐藏的觉醒者；最近几回合节奏慢一点')"
+                rows="5"
+              ></textarea>
+            </div>
+
             <div class="row">
               <div class="row-info">
                 <label class="row-name" for="setting-realm-map">{{ t('境界分层地图') }}</label>

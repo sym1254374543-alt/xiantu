@@ -23,12 +23,13 @@ import type {
   SectSystemV2,
   StatusEffect,
   BankCard,
+  AssetProfile,
 } from '@/types/game';
 import { calculateFinalAttributes } from '@/utils/attributeCalculation';
 import { isTavernEnv } from '@/utils/tavern';
 import { ensureSystemConfigHasNsfw } from '@/utils/nsfw';
 import { isSaveDataV3, migrateSaveDataToLatest } from '@/utils/saveMigration';
-import { normalizeInventoryCurrencies, normalizeBankCard } from '@/utils/currencySystem';
+import { normalizeInventoryCurrencies, normalizeBankCard, normalizeAssetProfile } from '@/utils/currencySystem';
 import { detectPlayerSectLeadership } from '@/utils/sectLeadershipUtils';
 
 function buildTechniqueProgress(inventory: Inventory | null) {
@@ -161,6 +162,8 @@ interface GameState {
   bodyPartDevelopment: Record<string, any> | null;
   // 角色.银行（银行账户；未开户时为 null）
   bank: BankCard | null;
+  // 角色.资产（非货币财产：房产/车辆/持股/其他；未登记时为 null）
+  assets: AssetProfile | null;
 
   // 时间点存档配置
   timeBasedSaveEnabled: boolean; // 是否启用时间点存档
@@ -216,6 +219,7 @@ export const useGameStateStore = defineStore('gameState', {
     body: null,
     bodyPartDevelopment: null,
     bank: null,
+    assets: null,
 
     // 时间点存档配置（默认关闭，用户可在设置中开启）
     timeBasedSaveEnabled: false,
@@ -456,6 +460,8 @@ export const useGameStateStore = defineStore('gameState', {
 
       // 银行账户：归一化时剔除非法币种/负余额（AI 偶尔会往卡里写灵石）
       this.bank = normalizeBankCard(v3?.角色?.银行 ? deepCopy(v3.角色.银行) : null);
+      // 非货币财产：房产/车辆/持股/其他
+      this.assets = normalizeAssetProfile(v3?.角色?.资产 ? deepCopy(v3.角色.资产) : null);
 
       // 兜底：旧存档可能没有模块对象
       if (!this.skillState) {
@@ -584,6 +590,7 @@ export const useGameStateStore = defineStore('gameState', {
           效果: this.effects ?? [],
           身体: body,
           银行: this.bank ?? undefined,
+          资产: this.assets ?? undefined,
           背包: this.inventory,
           装备: this.equipment,
           功法: techniqueSystem,
@@ -758,6 +765,7 @@ export const useGameStateStore = defineStore('gameState', {
       this.body = null;
       this.bodyPartDevelopment = null;
       this.bank = null;
+      this.assets = null;
 
       console.log('[GameState] State has been reset');
     },

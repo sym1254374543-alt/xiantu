@@ -31,6 +31,15 @@ const FACTION_DEPRECATED_KEYS = [
 /** 大陆上的英文镜像键（权威是 大洲边界） */
 const CONTINENT_MIRROR_KEYS = ['continent_bounds'] as const;
 
+/** 世界.信息 里系统内部用、与叙事无关的字段 */
+const WORLD_INFO_INTERNAL_KEYS = ['生成时间', '地图配置', '版本', '特殊设定'] as const;
+
+/** 地点上恒为空数组的字段 */
+const LOCATION_EMPTY_KEYS = ['特殊功能'] as const;
+
+/** 势力上恒为空数组、且"能否加入"已由 可否加入 表达 */
+const FACTION_EMPTY_KEYS = ['加入条件', '加入好处'] as const;
+
 const isObj = (v: unknown): v is Record<string, any> => !!v && typeof v === 'object' && !Array.isArray(v);
 
 function stripKeys(list: unknown, keys: readonly string[]): void {
@@ -38,6 +47,42 @@ function stripKeys(list: unknown, keys: readonly string[]): void {
   for (const item of list) {
     if (!isObj(item)) continue;
     for (const k of keys) delete item[k];
+  }
+}
+
+/**
+ * 大道阶段列表是**静态**数据（生成后不再变），每回合全发没有意义。
+ * 只在 AI 需要引用阶段名/推演升阶时才有用，故保留「当前阶段」与「下一阶段」的完整对象，
+ * 其余阶段只留名称。当前阶段是 0 基下标。
+ */
+function trimDaoStages(daos: unknown): void {
+  if (!isObj(daos)) return;
+  for (const dao of Object.values(daos)) {
+    if (!isObj(dao) || !Array.isArray(dao.阶段列表)) continue;
+    const cur = Number(dao.当前阶段);
+    dao.阶段列表 = dao.阶段列表.map((stage: unknown, i: number) => {
+      if (!isObj(stage)) return stage;
+      if (i === cur || i === cur + 1) return stage;
+      return { 名称: stage.名称 };
+    });
+  }
+}
+
+/**
+ * 大陆信息是真实世界的静态地理，玩家一次只身处一个大洲。
+ * 只保留玩家所在（或正前往）的大洲详情，其余只留名称与主要势力。
+ */
+function trimContinents(continents: unknown, playerPosition: unknown): void {
+  if (!Array.isArray(continents)) return;
+  const posText = String((playerPosition as any)?.描述 ?? '');
+  for (const c of continents) {
+    if (!isObj(c)) continue;
+    const name = String(c.名称 ?? c.name ?? '');
+    if (name && posText.includes(name)) continue;
+    for (const k of Object.keys(c)) {
+      if (k === '名称' || k === 'name' || k === '主要势力') continue;
+      delete c[k];
+    }
   }
 }
 
@@ -56,10 +101,20 @@ export function toPromptState<T>(state: T): T {
   if (isObj(info)) {
     stripKeys(info.势力信息, FACTION_MIRROR_KEYS);
     stripKeys(info.势力信息, FACTION_DEPRECATED_KEYS);
+    stripKeys(info.势力信息, FACTION_EMPTY_KEYS);
+    stripKeys(info.地点信息, LOCATION_EMPTY_KEYS);
     for (const key of ['大陆信息', 'continents'] as const) {
       stripKeys(info[key], CONTINENT_MIRROR_KEYS);
     }
+    for (const k of WORLD_INFO_INTERNAL_KEYS) delete info[k];
+    trimContinents(info.大陆信息, copy.角色?.位置);
   }
+
+  // 世界背景在 角色.身份.世界.description 与 世界.信息.世界背景 各存一份（内容完全相同），删前者
+  const idWorld = copy.角色?.身份?.世界;
+  if (isObj(idWorld)) delete idWorld.description;
+
+  trimDaoStages(copy.角色?.大道?.大道列表);
 
   return copy as T;
 }

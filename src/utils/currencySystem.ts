@@ -1,4 +1,4 @@
-import type { BankCard, BankTransaction, CurrencyAsset, CurrencySettings, Inventory } from '@/types/game';
+import type { AssetEntry, AssetProfile, BankCard, BankTransaction, CurrencyAsset, CurrencySettings, Inventory } from '@/types/game';
 
 export const DEFAULT_BASE_CURRENCY_ID = '人民币';
 
@@ -244,6 +244,44 @@ export function normalizeInventoryCurrencies(inventory: Inventory | null | undef
 }
 
 const BANK_TX_TYPES = ['存入', '取出', '转账', '收款', '消费'] as const;
+
+/**
+ * 归一化非货币财产（房产/车辆/持股/其他）。
+ * 只保留有 `名称` 的条目；估值非负数字；四类里没有内容的键直接丢弃。
+ * 完全为空时返回 null（表示没有登记财产，不凭空建档）。
+ */
+export function normalizeAssetProfile(raw: any): AssetProfile | null {
+  if (!isPlainObject(raw)) return null;
+
+  const result: AssetProfile = {};
+  const groups: (keyof AssetProfile)[] = ['房产', '车辆', '持股', '其他'];
+
+  for (const g of groups) {
+    const list = raw[g];
+    if (!Array.isArray(list)) continue;
+    const items: AssetEntry[] = [];
+    for (const it of list) {
+      if (!isPlainObject(it)) continue;
+      const 名称 = normalizeString(it.名称 ?? it.name);
+      if (!名称) continue;
+      const entry: AssetEntry = { 名称 };
+      const 类型 = normalizeString(it.类型 ?? it.type);
+      if (类型) entry.类型 = 类型;
+      const 估值 = Number(it.估值);
+      if (Number.isFinite(估值) && 估值 >= 0) entry.估值 = 估值;
+      const 币种 = normalizeString(it.币种);
+      if (币种) entry.币种 = 币种;
+      const 所在地 = normalizeString(it.所在地);
+      if (所在地) entry.所在地 = 所在地;
+      const 备注 = normalizeString(it.备注);
+      if (备注) entry.备注 = 备注;
+      items.push(entry);
+    }
+    if (items.length) result[g] = items;
+  }
+
+  return Object.keys(result).length ? result : null;
+}
 
 /**
  * 归一化银行账户。

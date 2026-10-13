@@ -319,6 +319,26 @@ export interface BankCard {
   交易记录?: BankTransaction[];
 }
 
+/** 非货币财产：房产 / 车辆 / 持股（公司、集团、股权）/ 其他 */
+export interface AssetEntry {
+  名称: string;
+  /** 住宅/别墅/公寓/商铺/写字楼… | 轿车/跑车/越野/游艇/私人飞机… | 公司/集团/股权… */
+  类型?: string;
+  估值?: number;
+  /** 估值所用币种（默认人民币） */
+  币种?: string;
+  所在地?: string;
+  备注?: string;
+}
+
+export interface AssetProfile {
+  房产?: AssetEntry[];
+  车辆?: AssetEntry[];
+  /** 公司 / 集团 / 股权 */
+  持股?: AssetEntry[];
+  其他?: AssetEntry[];
+}
+
 /** 功法中的技能信息 */
 export interface SkillInfo {
   name: string;
@@ -1070,10 +1090,9 @@ export interface NpcProfile {
     货币设置?: CurrencySettings;
     物品: Record<string, Item>;
   };
-  /** 银行账户（可选：该 NPC 未必开户） */
-  银行?: BankCard;
-
   // === 可选模块 ===
+  /** 非货币财产（房产/车辆/持股/其他，可选；没有就不写） */
+  资产?: AssetProfile;
   仪容?: SplendorProfile; // 酒馆端风华，与私密信息分开
   私密信息?: PrivacyProfile; // 仅NSFW模式下存在
   实时关注: boolean; // 标记为关注的NPC会在AI回合中主动更新

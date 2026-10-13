@@ -118,6 +118,23 @@ function normalizeLeadership(sectData: any): void {
 }
 
 /**
+ * 名称带修仙传称（宗/门/派/道场/洞天/仙门）的势力，必然是修仙传承。
+ * AI 却常把古老道统塞进「教团结社」（用户报过"太虚宗被标成教团结社"）。
+ * 这里只做**单向**纠正：传称 + 类型是「教团结社」/「其他」/空 → 改成「修仙宗门」。
+ * 不反向改（不会把"XX教"改成修仙宗门），也不动其他任何类型。
+ */
+const CULTIVATION_NAME_RE = /(宗|门|派|道场|洞天|仙门)$/;
+
+function coerceTypeByName(sectData: any): void {
+  const name = String(sectData?.名称 ?? sectData?.name ?? '').trim();
+  if (!name || !CULTIVATION_NAME_RE.test(name)) return;
+  const type = String(sectData.类型 ?? '').trim();
+  if (type === '教团结社' || type === '其他' || type === '') {
+    sectData.类型 = '修仙宗门';
+  }
+}
+
+/**
  * 验证并修复**单个**势力数据。
  *
  * ⚠️**本函数直接修改传入的对象**（就地修复）。
@@ -133,6 +150,9 @@ export function validateAndFixSectRealmData(sectData: any): any {
     sectData.领导层 = sectData.leadership;
   }
   delete sectData.leadership;
+
+  // 名称与类型一致（修"太虚宗→教团结社"这类错标）
+  coerceTypeByName(sectData);
 
   // 废弃的顶层字段（旧存档残留）
   delete sectData.最强修为;

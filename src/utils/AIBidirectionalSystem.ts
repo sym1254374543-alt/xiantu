@@ -23,6 +23,8 @@ import { validateAndRepairNpcProfile } from '@/utils/dataValidation';
 import { stripNsfwContent } from '@/utils/prompts/definitions/dataDefinitions';
 import { toPromptState } from '@/utils/aiPromptState';
 import { RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS, NARRATIVE_PURITY_RULES } from '@/utils/prompts/definitions/coreRules';
+// 分步第1步（只写正文）不发 businessRules；但认知边界与伪装/易容状态必须在正文里生效，故单独注入这两块
+import { NPC_KNOWLEDGE_BOUNDARY_RULES, PERSISTENT_STATE_RULES } from '@/utils/prompts/definitions/businessRules';
 import { isSaveDataV3, migrateSaveDataToLatest } from './saveMigration';
 import { parseJsonSmart } from '@/utils/jsonExtract';
 import type { APIUsageType } from '@/stores/apiManagementStore';
@@ -689,8 +691,17 @@ class AIBidirectionalSystemClass {
 # 中期记忆格式要求（用户自定义，用于 mid_term_memory 字段）
 ${midTermFormat}` : '');
 
+      // 📝 玩家笔记：玩家自己写的设定/偏好/剧情要求，优先级压过通用规则（单步与分步共用）
+      const playerNotesRaw = String((uiStore as any).playerNotes ?? '').trim();
+      const playerNotesSection = playerNotesRaw && (uiStore as any).enablePlayerNotes !== false
+        ? `# 玩家笔记（最高优先级）
+以下是玩家自己写下的设定、偏好或剧情要求；与前面的通用规则冲突时，**以本节为准**：
+${playerNotesRaw}`
+        : '';
+
       const systemPrompt = `
 ${assembledPrompt}
+${playerNotesSection}
 ${coreStatusSummary}
 ${narrativeRagSection ? `\n${narrativeRagSection}\n` : ''}
 # 游戏状态
@@ -752,6 +763,13 @@ ${NARRATIVE_PURITY_RULES}
 
 ---
 
+# 认知边界与当前形态（正文必须遵守）
+${NPC_KNOWLEDGE_BOUNDARY_RULES}
+
+${PERSISTENT_STATE_RULES}
+
+---
+
 # 判定系统（战斗/修炼/探索等场景必须使用）
 ${textFormatsPrompt}
 
@@ -764,6 +782,7 @@ ${worldStandardsPrompt}
 
 ${coreStatusSummary}
 ${narrativeRagSection ? `\n${narrativeRagSection}\n` : ''}
+${playerNotesSection ? `\n${playerNotesSection}\n` : ''}
 # 当前游戏状态（用于叙事判定，无需输出指令）
 ${narrativeStateJson}
 `.trim();
@@ -804,6 +823,7 @@ ${narrativeStateJson}
           const assembled = sections.map((section) => section.trim()).filter(Boolean).join('\n\n---\n\n');
           return `
 ${assembled}
+${playerNotesSection ? `\n${playerNotesSection}\n` : ''}
 
 ${coreStatusSummary}
 ${focusedNpcPrompt ? `\n${focusedNpcPrompt}\n` : ''}

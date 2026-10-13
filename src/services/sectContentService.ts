@@ -10,6 +10,7 @@ import { parseJsonFromText, parseJsonSmart } from '@/utils/jsonExtract';
 import { aiService } from '@/services/aiService';
 import { AIBidirectionalSystem } from '@/utils/AIBidirectionalSystem';
 import { createJoinedSectState } from '@/utils/sectSystemFactory';
+import { SECT_TASK_TYPES } from '@/utils/prompts/definitions/valueDomains';
 import { rollD20 } from '@/utils/diceRoller';
 import { realmRank } from '@/utils/realmOrder';
 import {
@@ -246,6 +247,26 @@ function normalizeStatus(v: unknown): string {
   return t;
 }
 
+/**
+ * 任务类型归一到值域白名单（见 valueDomains.SECT_TASK_TYPES）。
+ * 历史上缺省值是「日常」，不在白名单内；近义/英文写法也一并就近归一。
+ */
+function normalizeTaskType(v: unknown): string {
+  const t = String(v ?? '').trim();
+  if (!t) return '内门事务';
+  if ((SECT_TASK_TYPES as readonly string[]).includes(t)) return t;
+  if (t.includes('巡') || /patrol/i.test(t)) return '巡逻';
+  if (t.includes('采') || t.includes('收集') || /collect|gather/i.test(t)) return '采集';
+  if (t.includes('护送') || t.includes('押运') || /escort/i.test(t)) return '护送';
+  if (t.includes('除魔') || t.includes('剿') || /exorc|purge|hunt/i.test(t)) return '除魔';
+  if (t.includes('求援') || t.includes('救援') || /rescue|aid/i.test(t)) return '求援';
+  if (t.includes('侦') || t.includes('探查') || /scout|recon/i.test(t)) return '侦查';
+  if (t.includes('炼丹') || /alchem/i.test(t)) return '炼丹';
+  if (t.includes('炼器') || t.includes('铸造') || /forge|smith/i.test(t)) return '炼器';
+  if (t.includes('秘境') || /secret/i.test(t)) return '秘境';
+  return '内门事务';
+}
+
 function normalizeDifficulty(v: unknown): string {
   const t = String(v ?? '').trim();
   if (!t) return '中';
@@ -262,7 +283,7 @@ export function normalizeTask(raw: any, i: number): SectTask {
     任务ID: raw?.任务ID || raw?.id || `sect_task_${i}`,
     任务名称: raw?.任务名称 || raw?.name || '任务',
     任务描述: raw?.任务描述 || raw?.description || '',
-    任务类型: raw?.任务类型 || raw?.type || '日常',
+    任务类型: normalizeTaskType(raw?.任务类型 ?? raw?.type),
     难度: normalizeDifficulty(raw?.难度 ?? raw?.difficulty),
     贡献奖励: Number.isFinite(reward) ? reward : 0,
     额外奖励: raw?.额外奖励 || raw?.reward_extra || raw?.reward?.额外奖励 || '',
@@ -381,12 +402,13 @@ export async function generateMembers(ctx: SectContext): Promise<{ added: number
         好感度: 50,
         记忆: [],
         实时关注: false,
-        背包: { 灵石: { 下品: 0, 中品: 0, 上品: 0, 极品: 0 }, 物品: {} },
+        背包: { 货币: {}, 物品: {} },
         ...m,
         名字: name,
         势力归属: sectName,
         宗门: sectName,
       };
+      delete (rel[name] as any).年龄;
       added++;
     }
   });

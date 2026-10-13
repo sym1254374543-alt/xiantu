@@ -254,6 +254,24 @@
           </details>
         </template>
       </section>
+
+      <!-- 非货币财产：房产 / 车辆 / 持股 / 其他（由 AI 依剧情登记） -->
+      <section v-if="assetRows.length" class="bank">
+        <header class="bank-head"><span class="gm-label plain">财产</span></header>
+        <ul class="coins">
+          <li v-for="a in assetRows" :key="a.类别 + a.名称" class="coin">
+            <span class="coin-mark"><Landmark :size="18" /></span>
+            <span class="coin-main">
+              <b>{{ a.名称 }}</b>
+              <small>{{ a.类别 }}<template v-if="a.类型"> · {{ a.类型 }}</template><template v-if="a.备注"> · {{ a.备注 }}</template></small>
+            </span>
+            <span class="coin-amount" v-if="a.估值">
+              <b>{{ formatNumber(a.估值) }}</b>
+              <small>{{ a.币种 || '人民币' }}</small>
+            </span>
+          </li>
+        </ul>
+      </section>
     </div>
   </div>
 </template>
@@ -264,7 +282,7 @@ import {
   ArrowDown, ArrowUp, BookOpen, Coins, CreditCard, Flame, FlaskRound, Gem, Landmark, MapPin, Package, Pause, RefreshCw, Search, Shield, ShieldOff,
   Sparkles, Sword, Trash2, Undo2,
 } from 'lucide-vue-next';
-import type { Item } from '@/types/game';
+import type { Item, AssetProfile } from '@/types/game';
 import { useGameStateStore } from '@/stores/gameStateStore';
 import { useCharacterStore } from '@/stores/characterStore';
 import { EnhancedActionQueueManager } from '@/utils/enhancedActionQueue';
@@ -295,6 +313,30 @@ const allItems = computed<Item[]>(() =>
     .filter(([, v]) => v && typeof v === 'object')
     .map(([id, v]) => ({ ...(v as Item), 物品ID: (v as Item).物品ID || id })),
 );
+
+/** 非货币财产：房产 / 车辆 / 持股 / 其他 */
+const assetRows = computed(() => {
+  const a = gs.assets as AssetProfile | null;
+  if (!a || typeof a !== 'object') return [];
+  const groups: (keyof AssetProfile)[] = ['房产', '车辆', '持股', '其他'];
+  const out: { 类别: string; 名称: string; 类型?: string; 估值?: number; 币种?: string; 备注?: string }[] = [];
+  for (const key of groups) {
+    const list = a[key];
+    if (!Array.isArray(list)) continue;
+    for (const it of list) {
+      if (!it || typeof it !== 'object' || !it.名称) continue;
+      out.push({
+        类别: String(key),
+        名称: String(it.名称),
+        类型: it.类型 ? String(it.类型) : undefined,
+        估值: Number(it.估值) > 0 ? Number(it.估值) : undefined,
+        币种: it.币种 ? String(it.币种) : undefined,
+        备注: it.备注 ? String(it.备注) : undefined,
+      });
+    }
+  }
+  return out;
+});
 
 const equipmentIds = computed(() => {
   const eq = (gs.equipment || {}) as Record<string, unknown>;
