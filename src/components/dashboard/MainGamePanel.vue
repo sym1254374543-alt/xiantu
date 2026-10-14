@@ -282,6 +282,7 @@ import { calculateAgeFromBirthdate } from '@/utils/lifespanCalculator';
 import { aiService, type APIProvider, type ThinkingLevel } from '@/services/aiService';
 import { useAPIManagementStore } from '@/stores/apiManagementStore';
 import { extractStreamingNarrative, extractTextFromJsonResponse } from '@/utils/textSanitizer';
+import { diag } from '@/utils/diagnostics';
 import FormattedText from '@/components/common/FormattedText.vue';
 import PublicQuotaBar from '@/components/publicApi/PublicQuotaBar.vue';
 import { useGameStateStore } from '@/stores/gameStateStore';
@@ -1181,6 +1182,16 @@ const validateAIResponse = (response: unknown): { isValid: boolean; errors: stri
     }
   }
 
+  if (errors.length) {
+    // 失败原因此前只落在 console.warn 里，手机端看不到，用户只能看到一句笼统的"格式不正确"。
+    // 记进诊断（设置 → 调试模式 → 运行诊断），并让提示语带上具体原因。
+    diag.warn(
+      'AI响应格式',
+      `结构校验未通过：${errors.join('；')}`,
+      `响应字段：${Object.keys(resp).join(',') || '(空)'}；text ${typeof resp.text === 'string' ? resp.text.length + '字' : typeof resp.text}；摘要 ${typeof resp.mid_term_memory === 'string' ? resp.mid_term_memory.length + '字' : typeof resp.mid_term_memory}；指令 ${Array.isArray(resp.tavern_commands) ? resp.tavern_commands.length + '条' : typeof resp.tavern_commands}`
+    );
+  }
+
   return { isValid: errors.length === 0, errors };
 };
 
@@ -1524,7 +1535,7 @@ const sendMessage = async () => {
         const validation = validateAIResponse(aiResponse);
         if (!validation.isValid) {
           console.warn('[AI响应验证] 结构验证失败:', validation.errors);
-          toast.warning('AI响应格式不正确，正在重试...');
+          toast.warning(`AI响应格式不正确（${validation.errors.join('；')}），正在重试...`);
 
           // 尝试重新生成
           const retryResponse = await retryAIResponse(

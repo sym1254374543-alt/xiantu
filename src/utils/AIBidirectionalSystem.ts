@@ -27,6 +27,7 @@ import { RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS, NARRATIVE_PURITY_RULE
 import { NPC_KNOWLEDGE_BOUNDARY_RULES, PERSISTENT_STATE_RULES } from '@/utils/prompts/definitions/businessRules';
 import { isSaveDataV3, migrateSaveDataToLatest } from './saveMigration';
 import { parseJsonSmart } from '@/utils/jsonExtract';
+import { diag } from '@/utils/diagnostics';
 import type { APIUsageType } from '@/stores/apiManagementStore';
 import { buildJudgementRound, formatJudgementBlock } from '@/utils/judgement';
 import { ensureStoryImages, harvestStoryImages, parseStoryImagesFromObject } from '@/services/imagePlaceholders';
@@ -730,8 +731,9 @@ ${stateJsonString}
       const settings = await this.resolveGenerationSettings(options);
       const { aiService, useStreaming } = settings;
 
-      if (settings.splitEnabled) {
-        const buildSplitSystemPrompt = async (step: 1 | 2): Promise<string> => {
+      // 单步与分步共用这份「分步」提示词构造：单步若"正文可信但没拿到指令"，
+      // 直接用它只补一次指令（见下面 else 分支），而不是把整段正文重来。
+      const buildSplitSystemPrompt = async (step: 1 | 2): Promise<string> => {
           // 注意：getTavernHelper() 在网页版也不为空，环境必须用 isTavernEnv() 判断
           const tavernEnv = isTavernEnv();
 
@@ -833,6 +835,7 @@ ${stateJsonString}
 `.trim();
         };
 
+      if (settings.splitEnabled) {
         // ========== 第1步：正文生成（失败重试1次） ==========
         options?.onProgressUpdate?.('分步生成：第1步（正文）…');
         const injectsStep1: PromptInject[] = [
@@ -916,7 +919,53 @@ ${step1Text}
           injects,
           onStreamChunk: options?.onStreamChunk,
         }));
-        gmResponse = this.parseAIResponseLenient(response, settings.mainForceJson, actionOptionsEnabled, DEFAULT_ACTION_OPTIONS);
+        const parsedMain = this._parseWithSource(response, settings.mainForceJson, actionOptionsEnabled, DEFAULT_ACTION_OPTIONS);
+        gmResponse = parsedMain.response;
+
+        // 🔥 分类讨论：正文可信、但没有拿到指令 → 像分步模式那样**只补一次指令**，
+        // 而不是把整段正文作废重来（旧行为会让用户看到"正文被撤回"）。
+        // 正文不可信（截断/单引号/被引号腰斩）时不补——那种情况留着正文也没意义，交给上层整段重试。
+        if (parsedMain.textTrustworthy && gmResponse.text.trim() && !gmResponse.tavern_commands?.length) {
+          options?.onProgressUpdate?.('正文已完成，正在补生成指令…');
+          const injectsStep2: PromptInject[] = [
+            { content: await buildSplitSystemPrompt(2), role: 'system', depth: 4, position: 'in_chat' },
+            INPUT_GUARD_INJECT,
+          ];
+          const step2UserInput = `
+【用户本次操作】
+${userActionForAI}
+
+【第1步正文】
+${gmResponse.text}
+
+请按"分步生成（第2步）"规则输出 JSON。
+`.trim();
+          const filled = await this.generateSplitStep2({
+            request: (attempt) => aiService.generate({
+              user_input: step2UserInput,
+              should_stream: settings.step2Streaming,
+              generation_id: `${generationId}_fillcmd_${attempt}`,
+              usageType: settings.step2UsageType,
+              injects: injectsStep2,
+            }),
+            forceJson: settings.step2ForceJson,
+            actionOptionsEnabled,
+            defaultActionOptions: DEFAULT_ACTION_OPTIONS,
+            onProgressUpdate: options?.onProgressUpdate,
+            logTag: '补指令',
+            isCancelled: shouldAbort,
+          });
+          if (filled.tavern_commands?.length) gmResponse.tavern_commands = filled.tavern_commands;
+          if (!gmResponse.mid_term_memory && filled.mid_term_memory) gmResponse.mid_term_memory = filled.mid_term_memory;
+          if (actionOptionsEnabled && !gmResponse.action_options?.length && filled.action_options?.length) {
+            gmResponse.action_options = filled.action_options;
+          }
+          if (gmResponse.tavern_commands?.length) {
+            diag.info('AI指令补生成', `正文可信但原本没有指令，已补生成 ${gmResponse.tavern_commands.length} 条`);
+          } else {
+            diag.warn('AI指令补生成', '正文可信但没有指令，补生成也没拿到 → 将回落为整段重试');
+          }
+        }
       }
 
       const peeledReply = harvestStoryImages({
@@ -1229,15 +1278,10 @@ ${step1Text}
        */
       appendImplicitMidMemoryFromMidTerm?: boolean;
       /**
-       * 若 response.mid_term_memory 为空，是否为“短期记忆”补一个对应的“隐式中期记忆”
-       * - 默认 true（用截断后的 text 兜底）
+       * 若 response.mid_term_memory 为空，是否为「短期记忆」补一个对应的「隐式中期记忆」
+       * - 默认 true：先用完整正文占位保住下标对齐，再同步补一次小调用换成正经摘要
        */
       ensureImplicitMidForEachShortTerm?: boolean;
-      /**
-       * ensureImplicitMidForEachShortTerm 为 true 时，隐式中期的兜底内容最大长度
-       * - 默认 80
-       */
-      implicitMidFallbackMaxLen?: number;
     }
   ): Promise<{ saveData: SaveData; stateChanges: StateChangeLog }> {
     const abortRequested = () => shouldAbort?.() ?? false;
@@ -1256,10 +1300,6 @@ ${step1Text}
       appendShortTermMemoryFromText: options?.appendShortTermMemoryFromText !== false,
       appendImplicitMidMemoryFromMidTerm: options?.appendImplicitMidMemoryFromMidTerm !== false,
       ensureImplicitMidForEachShortTerm: options?.ensureImplicitMidForEachShortTerm !== false,
-      implicitMidFallbackMaxLen:
-        typeof options?.implicitMidFallbackMaxLen === 'number' && Number.isFinite(options.implicitMidFallbackMaxLen)
-          ? Math.max(20, Math.min(200, Math.floor(options.implicitMidFallbackMaxLen)))
-          : 80,
     };
 
     // 仅当需要写入叙事历史时才确保系统.历史.叙事存在
@@ -1319,7 +1359,10 @@ ${step1Text}
       (saveData as any).社交.记忆.隐式中期记忆.push(`${timePrefix}${midTermContent}`);
     }
 
-    // 兜底：若这次写入了短期记忆，但 mid_term_memory 为空，则补齐一条对应的隐式中期记忆，保持“短期-隐式中期”一一对应。
+    // 兜底：若这次写入了短期记忆，但 mid_term_memory 为空，则补齐一条对应的隐式中期记忆，
+    // 保持「短期记忆 ↔ 隐式中期记忆」的下标一一对应（提升为正式中期记忆时按下标 shift）。
+    // 做法：先用**完整正文**占位（不丢信息），再**同步**补一次小调用把这句叙事压成 50-100 字摘要，
+    // 回来**原位替换**那个占位。旧实现是把正文截断成 80 字——信息损失太大，已废弃。
     if (
       behavior.appendShortTermMemoryFromText &&
       textContent &&
@@ -1329,8 +1372,16 @@ ${step1Text}
       if (!(saveData as any).社交) (saveData as any).社交 = {};
       if (!(saveData as any).社交.记忆) (saveData as any).社交.记忆 = { 短期记忆: [], 中期记忆: [], 长期记忆: [], 隐式中期记忆: [] };
       if (!Array.isArray((saveData as any).社交.记忆.隐式中期记忆)) (saveData as any).社交.记忆.隐式中期记忆 = [];
-      const fallback = textContent.length > behavior.implicitMidFallbackMaxLen ? `${textContent.slice(0, behavior.implicitMidFallbackMaxLen)}…` : textContent;
-      (saveData as any).社交.记忆.隐式中期记忆.push(`${timePrefix}${fallback}`);
+
+      const implicitMidList = (saveData as any).社交.记忆.隐式中期记忆 as unknown[];
+      const slotIndex = implicitMidList.length;
+      implicitMidList.push(`${timePrefix}${textContent}`);
+
+      // 无指令的回合不会被落盘（见后面 tavern_commands 为空时的提前返回），补摘要没有意义
+      if (response.tavern_commands?.length) {
+        const summary = await this.summarizeOneMemory(textContent);
+        if (summary) implicitMidList[slotIndex] = `${timePrefix}${summary}`;
+      }
     }
 
     // 🔥 检查短期记忆是否超限，超限则删除最旧的短期记忆，并将对应的隐式中期记忆转化为正式中期记忆
@@ -1872,6 +1923,69 @@ ${saveDataJson}`, role: 'system', depth: 4, position: 'in_chat' },
       this.isSummarizing = false;
       console.log('[AI双向系统] 记忆总结流程结束，已释放锁。');
     }
+  }
+
+  /**
+   * 把一段叙事压成 50-100 字摘要，用于补写缺失的「隐式中期记忆」。
+   * 只在 AI 漏写 mid_term_memory 时触发（正常回合不会调用），失败返回空串，由调用方保留全文占位。
+   */
+  private async summarizeOneMemory(narrative: string): Promise<string> {
+    const text = String(narrative || '').trim();
+    if (!text) return '';
+    try {
+      const { aiService } = await import('@/services/aiService');
+      const prompt = `你是记忆整理者。这是纯文本总结任务，不是续写剧情。
+
+## 要求
+- 把下面的叙事压成 50-100 字摘要，第三人称，一到两句
+- 保留：人物、地点、关键事件与因果、物品得失、境界与关系变化
+- 舍去：对话原文、修辞、情绪渲染、过程细节
+- 只依据给定文本，不添加原文没有的事
+
+## 输出
+只输出JSON，不要代码块或其他文字：{"summary":"摘要内容"}
+
+## 待总结的叙事
+${text}`;
+      const raw = String(await aiService.generate({
+        user_input: prompt,
+        should_stream: false,
+        usageType: 'memory_summary',
+        injects: [],
+      }));
+      const parsed = parseJsonSmart<Record<string, unknown>>(raw, false, ['summary', 'text', '摘要']);
+      const summary = String((parsed as any)?.summary ?? (parsed as any)?.摘要 ?? (parsed as any)?.text ?? '').trim();
+      if (summary) {
+        diag.info('AI记忆补摘要', `本回合缺 mid_term_memory，已补出 ${summary.length} 字摘要替换全文占位`);
+      } else {
+        diag.warn('AI记忆补摘要', '补摘要返回空，保留完整正文占位（不截断）');
+      }
+      return summary.replace(/^(?:【[^】]*】)+\s*/, '');
+    } catch (e) {
+      console.warn('[AI双向系统] 补写隐式中期记忆失败，保留全文占位:', e);
+      diag.warn('AI记忆补摘要', `补摘要调用失败，保留完整正文占位：${e instanceof Error ? e.message : String(e)}`);
+      return '';
+    }
+  }
+
+  /**
+   * 指令统一成数组。
+   * 模型偶尔把 tavern_commands 写成单个对象、或以 JSON 字符串二次编码；旧实现直接透传，
+   * 于是校验报"tavern_commands 必须是数组"，整个回合白白重试一次。
+   */
+  private _coerceCommandsToArray(raw: unknown): TavernCommand[] {
+    if (Array.isArray(raw)) return raw as TavernCommand[];
+    if (raw && typeof raw === 'object') return [raw as TavernCommand];
+    if (typeof raw === 'string') {
+      const s = raw.trim();
+      if (!s) return [];
+      try {
+        const parsed = parseJsonSmart<unknown>(s, false);
+        if (Array.isArray(parsed)) return parsed as TavernCommand[];
+        if (parsed && typeof parsed === 'object') return [parsed as TavernCommand];
+      } catch { /* 解析不出来就当没有指令 */ }
+    }
+    return [];
   }
 
   private _preprocessCommands(commands: any[]): any[] {
@@ -2882,10 +2996,34 @@ ${saveDataJson}`, role: 'system', depth: 4, position: 'in_chat' },
     enableActionOptions: boolean,
     defaultActionOptions: string[],
   ): GM_Response {
+    return this._parseWithSource(rawResponse, forceJsonMode, enableActionOptions, defaultActionOptions).response;
+  }
+
+  /**
+   * 同 parseAIResponseLenient，但额外报告**正文可不可信**，供"分类讨论"使用：
+   * - textTrustworthy=true：正文来自解析出的对象，或来自正则且其后紧跟 `,`/`}`（说明是完整的 text 值）
+   *   → 若指令缺失，只补一次指令即可，不必把整段正文作废
+   * - textTrustworthy=false：整段原文当正文、正则被正文内部的引号腰斩、或严格路径解析出对象但没有正文
+   *   → 疑似截断/格式坏，留着正文也没意义，交给上层整段重试
+   */
+  private _parseWithSource(
+    rawResponse: string,
+    forceJsonMode: boolean,
+    enableActionOptions: boolean,
+    defaultActionOptions: string[],
+  ): { response: GM_Response; textTrustworthy: boolean } {
     try {
-      return this.parseAIResponse(rawResponse, forceJsonMode, enableActionOptions, defaultActionOptions);
+      const strict = this.parseAIResponse(rawResponse, forceJsonMode, enableActionOptions, defaultActionOptions);
+      // 严格路径解析成功：有正文即可信；对象里根本没有正文（键名完全不认识）则不可信
+      return { response: strict, textTrustworthy: !!strict.text.trim() };
     } catch (parseError) {
       console.error('[AI双向系统] 响应解析失败，尝试容错处理:', parseError);
+      // 记进诊断：手机端看不到控制台，必须把"为什么解析不了"和原始响应开头一起留下
+      diag.warn(
+        'AI响应解析',
+        `标准解析失败，转入宽松提取：${parseError instanceof Error ? parseError.message : String(parseError)}`,
+        `原始响应前 200 字：${String(rawResponse).slice(0, 200).replace(/\s+/g, ' ')}`
+      );
     }
 
     const responseText = String(rawResponse).trim();
@@ -2910,18 +3048,31 @@ ${saveDataJson}`, role: 'system', depth: 4, position: 'in_chat' },
     let memory = '';
     let commands: TavernCommand[] = [];
     let actionOptions: string[] = [];
+    let textTrustworthy = false;
 
     if (obj) {
-      text = obj.text || obj.叙事文本 || obj.narrative || '';
-      memory = obj.mid_term_memory || obj.中期记忆 || '';
-      commands = obj.tavern_commands || obj.指令 || [];
-      actionOptions = obj.action_options || [];
+      text = obj.text || obj.叙事文本 || obj.narrative || obj.正文 || '';
+      memory = obj.mid_term_memory || obj.中期记忆 || obj.memory || obj.midTermMemory || obj.记忆总结 || obj.summary || '';
+      commands = obj.tavern_commands || obj.指令 || obj.commands || [];
+      actionOptions = obj.action_options || obj.行动选项 || [];
+      textTrustworthy = !!String(text).trim();
     }
     if (!text) {
       // 4. 只抽 text 字段 5. 实在不行把整段当正文
-      const textMatch = responseText.match(/"(?:text|叙事文本|narrative)"\s*:\s*"((?:[^"\\]|\\.)*)"/);
-      text = textMatch?.[1] ? textMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"') : responseText;
+      const textMatch = responseText.match(/"(?:text|叙事文本|narrative|正文)"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+      if (textMatch?.[1]) {
+        text = textMatch[1].replace(/\\n/g, '\n').replace(/\\"/g, '"');
+        // 正则是在第一个未转义的 `"` 处停下的：只有其后紧跟 `,` 或 `}` 才说明抽到的是**完整的** text 值；
+        // 否则是被正文内部的引号腰斩（例如 "他说"你好"" 只会抽到「他说」）——这种正文不可信。
+        const after = responseText.slice((textMatch.index ?? 0) + textMatch[0].length).trimStart();
+        textTrustworthy = after.startsWith(',') || after.startsWith('}');
+      } else {
+        text = responseText;
+        textTrustworthy = false;
+      }
     }
+    // 指令必须是数组：模型偶尔写成单个对象或 JSON 字符串，直接透传会让校验判"必须是数组"而整回合重试
+    commands = this._coerceCommandsToArray(commands);
 
     // 双引号插图标记会截断 text 字段正则：从原文再捞一次
     const recovered = harvestStoryImages({ text, raw: responseText, obj });
@@ -2934,13 +3085,21 @@ ${saveDataJson}`, role: 'system', depth: 4, position: 'in_chat' },
       actionOptions = defaultActionOptions;
     }
 
-    console.warn('[AI双向系统] 使用容错模式提取内容 - 文本长度:', text.length, '记忆:', memory.length, '指令数:', commands.length, '行动选项:', actionOptions.length);
+    console.warn('[AI双向系统] 使用容错模式提取内容 - 文本长度:', text.length, '记忆:', memory.length, '指令数:', commands.length, '行动选项:', actionOptions.length, '正文可信:', textTrustworthy);
+    diag.info(
+      'AI响应解析',
+      `宽松提取完成：正文${text.length}字（可信=${textTrustworthy}）、摘要${memory.length}字、指令${commands.length}条`,
+      textTrustworthy ? undefined : `正文不可信（疑似截断/格式坏），原始响应前 200 字：${responseText.slice(0, 200).replace(/\s+/g, ' ')}`
+    );
     return {
-      text,
-      mid_term_memory: memory,
-      tavern_commands: commands,
-      action_options: this.sanitizeActionOptionsForDisplay(actionOptions),
-      storyImages: recovered.images,
+      textTrustworthy,
+      response: {
+        text,
+        mid_term_memory: memory,
+        tavern_commands: commands,
+        action_options: this.sanitizeActionOptionsForDisplay(actionOptions),
+        storyImages: recovered.images,
+      },
     };
   }
 
@@ -2987,8 +3146,8 @@ ${saveDataJson}`, role: 'system', depth: 4, position: 'in_chat' },
       }
 
       return {
-        text: String(obj.text || obj.叙事文本 || obj.narrative || ''),
-        mid_term_memory: String(obj.mid_term_memory || obj.中期记忆 || obj.memory || ''),
+        text: String(obj.text || obj.叙事文本 || obj.narrative || obj.正文 || ''),
+        mid_term_memory: String(obj.mid_term_memory || obj.中期记忆 || obj.memory || obj.midTermMemory || obj.记忆总结 || obj.summary || ''),
         tavern_commands: tavernCommands,
         action_options: enableActionOptions ? this.sanitizeActionOptionsForDisplay(normalized) : [],
         storyImages: parseStoryImagesFromObject(obj),
@@ -2996,8 +3155,11 @@ ${saveDataJson}`, role: 'system', depth: 4, position: 'in_chat' },
     };
 
     // 🔥 核心策略：使用统一的智能JSON解析（根据forceJsonMode自动选择策略）
+    // 多个可解析对象时优先含 GM 字段的那个，避免正文里先出现的小对象被当成结果
     try {
-      const parsedObj = parseJsonSmart<Record<string, unknown>>(rawText, forceJsonMode);
+      const parsedObj = parseJsonSmart<Record<string, unknown>>(rawText, forceJsonMode, [
+        'text', '叙事文本', '正文', 'narrative', 'mid_term_memory', '中期记忆', 'tavern_commands', '指令',
+      ]);
       return standardize(parsedObj);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
