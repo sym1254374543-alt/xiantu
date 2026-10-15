@@ -720,6 +720,12 @@ ${narrativeRagSection ? `\n${narrativeRagSection}\n` : ''}
 # 游戏状态
 你是这个修仙世界的GM。以下是当前完整游戏存档(JSON)，所有叙事与判定以此为准:
 ${stateJsonString}
+
+# 输出格式（最后一件事，务必遵守）
+本轮**只输出一个 JSON 对象**，不要任何前后说明文字、不要代码块围栏、不要 <thinking> 标签：
+{"text":"本回合叙事正文","mid_term_memory":"50-100字本回合摘要","tavern_commands":[{"action":"add","key":"元数据.时间.分钟","value":30}],"action_options":["选项1","选项2","选项3","选项4","选项5"]}
+- 四个字段都要有；正文写在 text 里（不要在 JSON 之外直接写正文）
+- 正文里的换行一律写 \n，不要直接回车
 `.trim();
 
       const userActionForAI = (userMessage && userMessage.toString().trim()) || '继续当前活动';
@@ -844,6 +850,11 @@ ${focusedNpcPrompt ? `\n${focusedNpcPrompt}\n` : ''}
 
 # 游戏状态（JSON）
 ${stateJsonString}
+
+# 输出格式（最后一件事，务必遵守）
+只输出一个 JSON 对象，不要任何前后说明文字、不要代码块围栏、不要 <thinking> 标签，**不要输出 text 字段**（正文已由第 1 步给出）：
+{"mid_term_memory":"50-100字本回合摘要","tavern_commands":[{"action":"add","key":"元数据.时间.分钟","value":30}],"action_options":["选项1","选项2","选项3","选项4","选项5"]}
+- tavern_commands 必须是数组；数值写数字（不要写 "30" 这样的字符串）
 `.trim();
         };
 
