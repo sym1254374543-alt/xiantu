@@ -142,11 +142,13 @@ export const FUNCTION_DESCS: Record<APIUsageType, string> = {
 export const AUX_FUNCTIONS: APIUsageType[] = ['memory_summary', 'text_optimization', 'world_generation', 'event_generation', 'sect_generation', 'crafting'];
 
 /**
- * 会在请求里打开 JSON 模式的渠道。
- * OpenAI 兼容格式（OpenAI / 自定义 / 智谱 / 豆包）不提供这个开关。
+ * 会在请求里打开 JSON 模式的渠道（即以 `response_format: json_object` 约束输出）。
  * DeepSeek 用 response_format，Gemini 用 response_mime_type。
+ *
+ * 「自定义（OpenAI 兼容）」也允许：自建/中转站大多就是 OpenAI 协议，能认这个参数。
+ * 少数中转会对未知参数直接 400——那时把这个开关关掉即可，不影响其它功能。
  */
-export const JSON_CAPABLE: APIProvider[] = ['deepseek', 'gemini'];
+export const JSON_CAPABLE: APIProvider[] = ['deepseek', 'gemini', 'custom'];
 
 /** createEmbeddings 能发出请求的渠道。其余对话渠道没有向量接口。 */
 export const EMBEDDING_USABLE: APIProvider[] = ['siliconflow-embedding', 'openai', 'deepseek', 'custom'];
