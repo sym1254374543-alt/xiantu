@@ -46,6 +46,18 @@ const INPUT_GUARD_INJECT: PromptInject = { content: '</input>', role: 'assistant
 const DEFAULT_ACTION_OPTIONS = ['继续当前活动', '观察周围环境', '与附近的人交谈', '查看自身状态', '稍作休息调整'];
 const DEFAULT_INITIAL_ACTION_OPTIONS = ['四处走动熟悉环境', '查看自身状态', '与附近的人交谈', '寻找修炼之地', '打听周围消息'];
 
+/**
+ * 粗判一段文本像不像「叙事正文」，用于区分
+ * "模型没包 JSON 的纯正文"（可信，保留）与"几句乱码/报错"（不可信，重来）。
+ * 判据：至少 100 个汉字，且带叙事标记（判定〔〕/环境【】/NPC内心 `...`/对话 ""）。
+ */
+function looksLikeNarrative(s: string): boolean {
+  const t = String(s || '').trim();
+  const cjk = (t.match(/[一-龥]/g) || []).length;
+  if (cjk < 100) return false;
+  return /〔[^〕]{2,}〕|【[^】]{1,}】|`[^`]{1,}`|"[^"]{1,}"|“[^”]{1,}”/.test(t);
+}
+
 const emptyGmResponse = (): GM_Response => ({ text: '', mid_term_memory: '', tavern_commands: [], action_options: [] });
 
 /** 记忆中心「自定义中期 / 长期记忆格式」（留空返回空字符串） */
@@ -3068,7 +3080,12 @@ ${text}`;
         textTrustworthy = after.startsWith(',') || after.startsWith('}');
       } else {
         text = responseText;
-        textTrustworthy = false;
+        // 整段原文当正文，要分两种情况：
+        // ① 响应里**完全没有 JSON 结构**（连 `{` 都没有）→ 模型就是没包 JSON，整段本身就是正文。
+        //    截断只会砍掉结尾，不会让开头的 `{"text":"` 消失，所以这**不可能是截断**。
+        //    只要它像个叙事就判可信 → 走"只补指令"，而不是把上千字正文作废重来。
+        // ② 含 `{` 却解析不出对象 → 疑似截断/格式坏 → 不可信，交给上层整段重试。
+        textTrustworthy = !responseText.includes('{') && looksLikeNarrative(responseText);
       }
     }
     // 指令必须是数组：模型偶尔写成单个对象或 JSON 字符串，直接透传会让校验判"必须是数组"而整回合重试

@@ -209,7 +209,25 @@ export function guardRealmValue(holder: any, field: string, who = ''): boolean {
   if (typeof raw !== 'string' || !raw.trim()) return false
   const t = raw.trim()
 
-  // 合法：大境界名，或 大境界+小阶段
+  // ⚠️「阶段」字段写的是**小阶段**（初期/中期/后期/圆满/极境），不是大境界。
+  // 这里曾经统一拿大境界表校验，于是每个 NPC、每个玩家都会被刷一条
+  // "阶段「中期」无法识别"的假警报——既误导排查，又把运行诊断塞满噪音。
+  if (field === '阶段') {
+    if ((REALM_STAGES as readonly string[]).includes(t)) return false
+    // 兼容历史写法：阶段里写了整串「练气中期」→ 只取小阶段
+    const big = REALMS.find((r) => t.startsWith(r))
+    if (big && (REALM_STAGES as readonly string[]).includes(t.slice(big.length))) {
+      holder[field] = t.slice(big.length)
+      diag.warn('值域·境界', `${who}阶段「${t}」写成了整串，已改为「${holder[field]}」`,
+        `阶段只写：${REALM_STAGES.join('/')}`)
+      return true
+    }
+    diag.warn('值域·境界', `${who}阶段「${t}」不是合法小阶段`,
+      `合法写法：${REALM_STAGES.join('/')}（凡人没有阶段，留空）`)
+    return false
+  }
+
+  // 其余字段（境界名称 / 领导层修为 / 成员境界）：合法值为 大境界名，或 大境界+小阶段
   if (REALMS.includes(t as any)) return false
   const big = REALMS.find((r) => t.startsWith(r))
   if (big) {
