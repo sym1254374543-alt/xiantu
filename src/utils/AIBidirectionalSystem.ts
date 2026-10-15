@@ -726,6 +726,7 @@ ${stateJsonString}
 {"text":"本回合叙事正文","mid_term_memory":"50-100字本回合摘要","tavern_commands":[{"action":"add","key":"元数据.时间.分钟","value":30}],"action_options":["选项1","选项2","选项3","选项4","选项5"]}
 - 四个字段都要有；正文写在 text 里（不要在 JSON 之外直接写正文）
 - 正文里的换行一律写 \n，不要直接回车
+- **正文照常写足：常规 500-1000 字**，突破/大战/关键剧情可到 1500 字。上面的示例只是**结构示意**，不是长度标准——不要因为要输出 JSON 就把正文写短
 `.trim();
 
       const userActionForAI = (userMessage && userMessage.toString().trim()) || '继续当前活动';
