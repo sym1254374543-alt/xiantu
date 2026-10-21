@@ -147,6 +147,24 @@
         <section class="card">
           <div class="c-row">
             <div>
+              <h4 class="c-name">玩家笔记</h4>
+              <p class="c-desc">你自己写的设定 / 偏好 / 剧情要求。每回合以最高优先级发给 AI，可随时改，用来随手纠偏</p>
+            </div>
+            <label class="gm-switch"><input v-model="ui.enablePlayerNotes" type="checkbox" aria-label="启用玩家笔记" /><span></span></label>
+          </div>
+          <textarea
+            v-if="ui.enablePlayerNotes"
+            v-model="ui.playerNotes"
+            class="gm-field area"
+            rows="5"
+            placeholder="例如：剧情多写日常与职场，少写打斗；主角不会主动杀人；把我同事写成隐藏的觉醒者；最近几回合节奏慢一点"
+            aria-label="玩家笔记"
+          ></textarea>
+        </section>
+
+        <section class="card">
+          <div class="c-row">
+            <div>
               <h4 class="c-name">境界分层地图</h4>
               <p class="c-desc">按角色境界分别记录世界地图，旧存档开启后自动迁移</p>
             </div>
