@@ -660,6 +660,7 @@ class AIBidirectionalSystemClass {
             效果: stateForAI.角色?.效果,
             身体: stateForAI.角色?.身体,
             背包: stateForAI.角色?.背包,
+            资产: stateForAI.角色?.资产,
             装备: stateForAI.角色?.装备,
             功法: stateForAI.角色?.功法,
             修炼: stateForAI.角色?.修炼,
