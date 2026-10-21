@@ -731,7 +731,10 @@ ${stateJsonString}
 
       const userActionForAI = (userMessage && userMessage.toString().trim()) || '继续当前活动';
 
-      const recentEventsInject = this.buildRecentEventsInject(shortTermMemoryForPrompt);
+      const recentEventsInject = this.buildRecentEventsInject(
+        shortTermMemoryForPrompt,
+        this._formatGameTime((stateForAI as any)?.元数据?.时间)
+      );
       const judgementInject: PromptInject = {
         content: formatJudgementBlock(judgementRound),
         role: 'system',
@@ -2975,10 +2978,16 @@ ${text}`;
   }
 
   /** 「最近事件」注入：把短期记忆作为 assistant 消息发送，保证剧情衔接 */
-  private buildRecentEventsInject(shortTermMemory: string[]): PromptInject | null {
+  private buildRecentEventsInject(shortTermMemory: string[], nowText?: string): PromptInject | null {
     if (!shortTermMemory.length) return null;
+    const nowLine = nowText ? `\n当前时间：${nowText}` : '';
     return {
-      content: `# 【最近事件】\n${shortTermMemory.join('\n')}\n\n以上是刚刚发生的剧情。下一段正文紧接其后：衔接流畅，不重复已写内容，不与之矛盾。`,
+      content: `# 【最近事件】
+${shortTermMemory.join('\n')}${nowLine}
+
+以上是最近发生的剧情，每条开头的【】就是它的发生时间。
+写下一段之前，先按「当前时间」判断距最后一条过去了多久：间隔很短就无缝衔接；间隔较长（数小时/数天/数月）就在叙事里自然交代时间已经过去，不要一律当成刚刚发生。
+衔接要求：承接前文，不重复已写内容，不与之矛盾。`,
       role: 'assistant',
       depth: 2,
       position: 'in_chat',
