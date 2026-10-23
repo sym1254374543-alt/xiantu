@@ -26,8 +26,7 @@ import type {
   AssetProfile,
 } from '@/types/game';
 import { calculateFinalAttributes } from '@/utils/attributeCalculation';
-import { isTavernEnv } from '@/utils/tavern';
-import { ensureSystemConfigHasNsfw } from '@/utils/nsfw';
+import { ensureSystemConfigHasNsfw, getContentSettings } from '@/utils/nsfw';
 import { isSaveDataV3, migrateSaveDataToLatest } from '@/utils/saveMigration';
 import { normalizeInventoryCurrencies, normalizeBankCard, normalizeAssetProfile } from '@/utils/currencySystem';
 import { detectPlayerSectLeadership } from '@/utils/sectLeadershipUtils';
@@ -440,18 +439,19 @@ export const useGameStateStore = defineStore('gameState', {
 
       this.effects = Array.isArray(effects) ? deepCopy(effects) : [];
       this.systemConfig = systemConfig ? deepCopy(systemConfig) : null;
-      if (isTavernEnv() && this.systemConfig) {
-        this.systemConfig = ensureSystemConfigHasNsfw(this.systemConfig) as any;
-      }
+      this.systemConfig = ensureSystemConfigHasNsfw(this.systemConfig) as any;
+      const contentSettings = getContentSettings(this.systemConfig);
 
-      // Tavern 兜底：即使存档没带“角色.身体”，也保证 UI/变量面板有可写路径
-      if (isTavernEnv()) {
+      // 仪容/法身兜底：任一能力开启时保证 角色.身体 有可写路径
+      if (contentSettings.splendorMode || contentSettings.nsfwMode) {
         const bodyObj: Record<string, any> =
           body && typeof body === 'object' ? deepCopy(body) : {};
-        if (bodyObj.部位 === undefined) bodyObj.部位 = {};
-        if (bodyObj.部位开发 === undefined) bodyObj.部位开发 = bodyPartDevelopment ?? {};
-        bodyPartDevelopment = bodyObj.部位开发 ?? bodyPartDevelopment;
-        this.body = bodyObj;
+        if (contentSettings.nsfwMode) {
+          if (bodyObj.部位 === undefined) bodyObj.部位 = {};
+          if (bodyObj.部位开发 === undefined) bodyObj.部位开发 = bodyPartDevelopment ?? {};
+          bodyPartDevelopment = bodyObj.部位开发 ?? bodyPartDevelopment;
+        }
+        this.body = Object.keys(bodyObj).length > 0 ? bodyObj : null;
       } else {
         this.body = body && typeof body === 'object' ? deepCopy(body) : null;
       }
@@ -573,7 +573,7 @@ export const useGameStateStore = defineStore('gameState', {
           baseBody.部位开发 = deepCopy(this.bodyPartDevelopment);
         }
 
-        if (isTavernEnv()) {
+        if (getContentSettings(this.systemConfig).nsfwMode) {
           if (baseBody.部位 === undefined) baseBody.部位 = {};
           if (baseBody.部位开发 === undefined) baseBody.部位开发 = {};
         }

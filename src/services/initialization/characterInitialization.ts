@@ -14,7 +14,7 @@ import type { World, Origin, SpiritRoot } from '@/types';
 import type { GM_Response, TavernCommand } from '@/types/AIGameMaster';
 import { AIBidirectionalSystem } from '@/utils/AIBidirectionalSystem';
 import { isTavernEnv } from '@/utils/tavern';
-import { getNsfwSettingsFromStorage, ensureSystemConfigHasNsfw } from '@/utils/nsfw';
+import { getNsfwSettingsFromStorage, getContentSettings, ensureSystemConfigHasNsfw } from '@/utils/nsfw';
 import { createEmptyThousandDaoSystem } from '@/data/thousandDaoData';
 import { buildCharacterInitializationPrompt, buildCharacterSelectionsSummary } from '@/utils/prompts/tasks/characterInitializationPrompts';
 import { validateGameData } from '@/utils/dataValidation';
@@ -263,7 +263,7 @@ function prepareInitialData(baseInfo: CharacterBaseInfo, age: number): { saveDat
   const location = playerStatus.位置;
 
   // 创建基础存档结构
-  const tavernEnv = isTavernEnv();
+  const contentSettings = getNsfwSettingsFromStorage();
   const legacySaveData: SaveData = {
     角色: processedBaseInfo,
     属性: attributes as any,
@@ -308,20 +308,16 @@ function prepareInitialData(baseInfo: CharacterBaseInfo, age: number): { saveDat
         '⚠️ 先创建后修改：修改数据前必须确保数据已存在',
         '装备字段：装备1-6'
       ],
-      ...(tavernEnv ? {
-        // 🔥 NSFW设置：从localStorage读取用户设置
-        ...getNsfwSettingsFromStorage()
-      } : {})
+      // 内容能力：仪容与 NSFW 分开，按本地设置初始化
+      ...contentSettings
     }
   };
 
-  // 🔥 初始化玩家身体详细数据（酒馆模式）
-  // 酒馆端：无论 NSFW 开关，都初始化身体骨架（用于法身面板展示基础体格）
-  // AI 会根据提示词在初始化时填充基础体格数据（身高/体重/三围等）
+  // 初始化玩家身体骨架（仪容或 NSFW 任一开启）
   // 敏感字段（胸部描述/私处描述等）仅在 nsfwMode=true 时由 AI 生成
-  if (tavernEnv) {
-    console.log('[角色初始化] 酒馆端检测：初始化角色.身体骨架（等待AI生成法身数据）');
-    legacySaveData.身体 = { 部位开发: {}, 部位: {} } as any;
+  if (contentSettings.splendorMode || contentSettings.nsfwMode) {
+    console.log('[角色初始化] 初始化角色.身体骨架（等待AI生成法身/仪容数据）');
+    legacySaveData.身体 = contentSettings.nsfwMode ? ({ 部位开发: {}, 部位: {} } as any) : ({} as any);
   }
 
   // 开局阶段统一返回 V3 五域结构，保证后续提示词/指令使用短路径生效
@@ -451,8 +447,10 @@ async function generateOpeningScene(saveData: SaveData, baseInfo: CharacterBaseI
   console.log('[初始化流程] 3. 生成开场剧情');
   const uiStore = useUIStore();
   const tavernEnv = isTavernEnv();
-  const nsfwEnabled = tavernEnv && Boolean((saveData as any).系统?.配置?.nsfwMode);
-  uiStore.enterLoadingStage('story', nsfwEnabled ? '整理设定（含法身数据）' : '整理角色设定');
+  const contentSettings = getContentSettings((saveData as any).系统?.配置);
+  const nsfwEnabled = contentSettings.nsfwMode;
+  const bodyEnabled = contentSettings.splendorMode || nsfwEnabled;
+  uiStore.enterLoadingStage('story', bodyEnabled ? '整理设定（含法身/仪容）' : '整理角色设定');
   uiStore.setLoadingStreamKind('story'); // 清掉上一步（世界）的预览
 
   // 🔥 现在baseInfo中的字段已经是完整对象了
@@ -497,10 +495,8 @@ async function generateOpeningScene(saveData: SaveData, baseInfo: CharacterBaseI
     })) || [],
     mapConfig: (saveData as any).世界?.信息?.地图配置,
     systemSettings: {
-      ...(tavernEnv
-        ? (ensureSystemConfigHasNsfw((saveData as any).系统?.配置 ?? {}) as any)
-        : ((saveData as any).系统?.配置 || {})),
-      // 🔥 明确标识当前是否为酒馆环境，用于提示词判断是否需要生成法身数据
+      ...(ensureSystemConfigHasNsfw((saveData as any).系统?.配置 ?? {}) as any),
+      // 仅作环境标识；是否生成法身/私密信息改由 splendorMode / nsfwMode 决定
       isTavernEnv: tavernEnv
     }
   };
@@ -754,7 +750,7 @@ async () => {
   gameStateStore.loadFromSaveData(saveDataAfterCommands);
   void import('@/services/storyImageRunner').then((mod) => mod.runPendingStoryImages());
 
-  if (nsfwEnabled) {
+  if (bodyEnabled) {
     const hasBodyCommands = Array.isArray((initialMessageResponse as any).tavern_commands)
       ? ((initialMessageResponse as any).tavern_commands as TavernCommand[]).some((cmd) => {
           if (!cmd || cmd.action !== 'set') return false;
@@ -762,7 +758,7 @@ async () => {
           return typeof key === 'string' && (key.startsWith('角色.身体') || key.startsWith('身体.'));
         })
       : false;
-    if (hasBodyCommands) toast.success('已生成法身数据（酒馆）');
+    if (hasBodyCommands) toast.success(nsfwEnabled ? '已生成法身与私密信息' : '已生成法身与仪容');
   }
 
   const openingStory = String(initialMessageResponse.text || '');

@@ -35,8 +35,9 @@ export function useApiManager() {
   const streaming = ref(true);
   const split = ref(false);
   const retry = ref(1);
-  const nsfw = ref(true);
+  const nsfw = ref(false);
   const nsfwGender = ref<NsfwGenderFilter>('female');
+  const splendor = ref(true);
 
   const load = async () => {
     store.loadFromStorage();
@@ -49,6 +50,7 @@ export function useApiManager() {
     const n = getNsfwSettingsFromStorage();
     nsfw.value = n.nsfwMode;
     nsfwGender.value = n.nsfwGenderFilter;
+    splendor.value = n.splendorMode;
   };
 
   watch(streaming, (v) => {
@@ -65,7 +67,12 @@ export function useApiManager() {
     saveGameSettings({ retryCount: n });
     aiService.saveConfig({ ...aiService.getConfig(), maxRetries: n });
   };
-  const saveNsfw = () => saveGameSettings({ enableNsfwMode: nsfw.value, nsfwGenderFilter: nsfwGender.value });
+  const saveNsfw = () =>
+    saveGameSettings({
+      enableNsfwMode: nsfw.value,
+      nsfwGenderFilter: nsfwGender.value,
+      enableSplendorMode: splendor.value,
+    });
 
   /** 酒馆模式下默认 API 显示为「酒馆 API」 */
   const displayName = (api: APIConfig) => (inTavern.value && api.id === 'default' ? '酒馆 API' : api.name);
@@ -251,7 +258,7 @@ export function useApiManager() {
   };
 
   return {
-    store, inTavern, streaming, split, retry, nsfw, nsfwGender, load, saveSplit, saveRetry, saveNsfw,
+    store, inTavern, streaming, split, retry, nsfw, nsfwGender, splendor, load, saveSplit, saveRetry, saveNsfw,
     displayName, isActive, assignedTo, assignmentOf, assign, useForChat, setEmbeddingEnabled, syncDefault, testing, testResults, test, fetchModels, save, remove,
   };
 }

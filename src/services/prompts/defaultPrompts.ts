@@ -11,7 +11,7 @@ import { getSaveDataStructureForEnv } from '@/utils/prompts/definitions/dataDefi
 import { CHARACTER_INIT_TASK_PROMPT } from '@/utils/prompts/tasks/characterInitializationPrompts';
 import { EnhancedWorldPromptBuilder } from '@/utils/worldGeneration/enhancedWorldPrompts';
 import { promptStorage } from './promptStorage';
-import { isTavernEnv } from '@/utils/tavern';
+import { getNsfwSettingsFromStorage } from '@/utils/nsfw';
 // 核心规则
 import { JSON_OUTPUT_RULES, RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS, NARRATIVE_PURITY_RULES } from '@/utils/prompts/definitions/coreRules';
 import { renderValueDomainsPrompt } from '@/utils/prompts/definitions/valueDomains';
@@ -55,6 +55,7 @@ import { EVENT_SYSTEM_RULES } from '@/utils/prompts/definitions/eventSystemRules
 import { PLAYER_PERSONALITY_RULES } from '@/utils/prompts/definitions/playerPersonality';
 import { NARRATIVE_PRESETS } from '@/data/stylePresets';
 import { NPC_RELATION_NETWORK_RULES, NPC_RELATION_COMMANDS, NPC_FACTION_RULES } from '@/utils/prompts/definitions/npcRelationRules';
+import { SPLENDOR_RULES, NSFW_RULES_TEMPLATE, BODY_INIT_RULES, NSFW_BODY_INIT_RULES } from '@/utils/prompts/definitions/contentRules';
 
 export interface PromptDefinition {
   name: string;
@@ -375,7 +376,7 @@ const TEXT_OPTIMIZATION_PROMPT = `
 `.trim();
 
 export function getSystemPrompts(): Record<string, PromptDefinition> {
-  const tavernEnv = isTavernEnv();
+  const contentSettings = getNsfwSettingsFromStorage();
   return {
     // ==================== 核心请求提示词（合并版） ====================
     coreOutputRules: {
@@ -421,7 +422,7 @@ export function getSystemPrompts(): Record<string, PromptDefinition> {
     },
     dataDefinitions: {
       name: '3. 数据结构',
-      content: getSaveDataStructureForEnv(tavernEnv),
+      content: getSaveDataStructureForEnv({ body: contentSettings.splendorMode, nsfw: contentSettings.nsfwMode }),
       category: 'coreRequest',
       description: '存档结构定义',
       order: 3,
@@ -539,6 +540,44 @@ export function getSystemPrompts(): Record<string, PromptDefinition> {
       description: '开局叙事与初始数据指令（酒馆端的法身要求会自动追加）',
       order: 2,
       weight: 9
+    },
+
+    // ==================== 内容能力（仪容 / NSFW 分开） ====================
+    splendorRules: {
+      name: '13. 风华仪容',
+      content: SPLENDOR_RULES,
+      category: 'coreRequest',
+      description: '外貌/仪容生成规则（与 NSFW 分开）',
+      order: 13,
+      weight: 6,
+      defaultEnabled: true
+    },
+    nsfwRules: {
+      name: '14. NSFW规则',
+      content: NSFW_RULES_TEMPLATE,
+      category: 'coreRequest',
+      description: '私密信息与性别过滤；{{NSFW_GENDER_FILTER}} 会替换为当前设置',
+      order: 14,
+      weight: 6,
+      defaultEnabled: true
+    },
+    bodyInitRules: {
+      name: '15. 开局法身与仪容',
+      content: BODY_INIT_RULES,
+      category: 'initialization',
+      description: '开局生成玩家法身与仪容',
+      order: 3,
+      weight: 7,
+      defaultEnabled: true
+    },
+    nsfwBodyInitRules: {
+      name: '16. 开局私密字段',
+      content: NSFW_BODY_INIT_RULES,
+      category: 'initialization',
+      description: '开局生成私密字段（仅 nsfwMode）',
+      order: 4,
+      weight: 6,
+      defaultEnabled: true
     },
 
     // ==================== 文本优化提示词 ====================

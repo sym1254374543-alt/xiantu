@@ -305,34 +305,45 @@
             </div>
           </div>
 
-          <template v-if="isTavernEnvFlag">
-            <div class="setting-item">
-              <div class="setting-info">
-                <label class="setting-name" for="api-nsfw">{{ t('成人内容模式') }}</label>
-                <span class="setting-desc">{{ t('启用后NPC可能产生成人向互动内容') }}</span>
-              </div>
-              <div class="setting-control">
-                <label class="setting-switch">
-                  <input id="api-nsfw" type="checkbox" v-model="nsfwMode" @change="saveNsfwSettings" />
-                  <span class="switch-slider"></span>
-                </label>
-              </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <label class="setting-name" for="api-splendor">{{ t('外貌/仪容') }}</label>
+              <span class="setting-desc">{{ t('开启后生成角色与 NPC 的可见外貌、体态、衣着与气质') }}</span>
             </div>
+            <div class="setting-control">
+              <label class="setting-switch">
+                <input id="api-splendor" type="checkbox" v-model="splendorMode" @change="saveNsfwSettings" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
 
-            <div v-if="nsfwMode" class="setting-item nested">
-              <div class="setting-info">
-                <label class="setting-name" for="api-nsfw-gender">{{ t('性别偏好') }}</label>
-                <span class="setting-desc">{{ t('只让所选性别的 NPC 参与成人互动') }}</span>
-              </div>
-              <div class="setting-control">
-                <select id="api-nsfw-gender" v-model="nsfwGenderFilter" class="setting-select" @change="saveNsfwSettings">
-                  <option value="female">{{ t('仅女性') }}</option>
-                  <option value="male">{{ t('仅男性') }}</option>
-                  <option value="all">{{ t('不限性别') }}</option>
-                </select>
-              </div>
+          <div class="setting-item">
+            <div class="setting-info">
+              <label class="setting-name" for="api-nsfw">{{ t('成人内容模式') }}</label>
+              <span class="setting-desc">{{ t('启用后NPC可能产生成人向互动内容，并写入私密字段') }}</span>
             </div>
-          </template>
+            <div class="setting-control">
+              <label class="setting-switch">
+                <input id="api-nsfw" type="checkbox" v-model="nsfwMode" @change="saveNsfwSettings" />
+                <span class="switch-slider"></span>
+              </label>
+            </div>
+          </div>
+
+          <div v-if="nsfwMode" class="setting-item nested">
+            <div class="setting-info">
+              <label class="setting-name" for="api-nsfw-gender">{{ t('性别偏好') }}</label>
+              <span class="setting-desc">{{ t('只让所选性别的 NPC 参与成人互动') }}</span>
+            </div>
+            <div class="setting-control">
+              <select id="api-nsfw-gender" v-model="nsfwGenderFilter" class="setting-select" @change="saveNsfwSettings">
+                <option value="female">{{ t('仅女性') }}</option>
+                <option value="male">{{ t('仅男性') }}</option>
+                <option value="all">{{ t('不限性别') }}</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -811,8 +822,9 @@ onMounted(() => {
 const streamingEnabled = ref(true);
 const splitResponseGeneration = ref(false); // 分步生成开关，默认关闭
 const isTavernEnvFlag = ref(isTavernEnv());
-const nsfwMode = ref(true);
+const nsfwMode = ref(false);
 const nsfwGenderFilter = ref<NsfwGenderFilter>('female');
+const splendorMode = ref(true);
 const retryCount = ref(1); // 重试次数，默认1次
 
 const readGameSettings = (): Record<string, unknown> => {
@@ -840,6 +852,7 @@ const loadLocalSettings = () => {
   const nsfwSettings = getNsfwSettingsFromStorage();
   nsfwMode.value = nsfwSettings.nsfwMode;
   nsfwGenderFilter.value = nsfwSettings.nsfwGenderFilter;
+  splendorMode.value = nsfwSettings.splendorMode;
   isTavernEnvFlag.value = isTavernEnv();
 
   // 加载分步生成设置
@@ -865,6 +878,7 @@ const saveNsfwSettings = () => {
   saveGameSettings({
     enableNsfwMode: nsfwMode.value,
     nsfwGenderFilter: nsfwGenderFilter.value,
+    enableSplendorMode: splendorMode.value,
   });
 };
 

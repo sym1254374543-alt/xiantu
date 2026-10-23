@@ -35,6 +35,7 @@ export interface SystemConfig extends AIMetadata {
   提示?: string | string[]; // 可放置给AI的约束提示，随存档一并注入
   nsfwMode?: boolean; // 是否开启NSFW模式
   nsfwGenderFilter?: 'all' | 'male' | 'female'; // NSFW性别过滤
+  splendorMode?: boolean; // 是否生成外貌/仪容（与 NSFW 解耦）
   isTavernEnv?: boolean; // 是否为酒馆环境（用于判断是否需要生成法身数据）
 }
 

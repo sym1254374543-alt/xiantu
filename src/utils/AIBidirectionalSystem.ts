@@ -20,7 +20,8 @@ import { normalizeGameTime } from './time';
 import { updateStatusEffects } from './statusEffectManager';
 import { sanitizeAITextForDisplay } from '@/utils/textSanitizer';
 import { validateAndRepairNpcProfile } from '@/utils/dataValidation';
-import { stripNsfwContent } from '@/utils/prompts/definitions/dataDefinitions';
+import { stripNsfwContent, augmentDataDefinitionsPrompt } from '@/utils/prompts/definitions/dataDefinitions';
+import { getContentSettings } from '@/utils/nsfw';
 import { toPromptState } from '@/utils/aiPromptState';
 import { RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS, NARRATIVE_PURITY_RULES } from '@/utils/prompts/definitions/coreRules';
 // 分步第1步（只写正文）不发 businessRules；但认知边界与伪装/易容状态必须在正文里生效，故单独注入这两块
@@ -759,8 +760,8 @@ ${stateJsonString}
       // 单步与分步共用这份「分步」提示词构造：单步若"正文可信但没拿到指令"，
       // 直接用它只补一次指令（见下面 else 分支），而不是把整段正文重来。
       const buildSplitSystemPrompt = async (step: 1 | 2): Promise<string> => {
-          // 注意：getTavernHelper() 在网页版也不为空，环境必须用 isTavernEnv() 判断
-          const tavernEnv = isTavernEnv();
+          // 内容能力按存档配置/本地设置决定，不再按酒馆环境硬门控
+          const contentSettings = getContentSettings((stateForAI as any)?.系统?.配置);
 
           if (step === 1) {
             // 第1步：只输出正文纯文本，不需要JSON格式和指令相关的提示词
@@ -825,7 +826,10 @@ ${narrativeStateJson}
             getPrompt('worldStandards')
           ]);
 
-          const sanitizedDataDefinitionsPrompt = tavernEnv ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt);
+          const sanitizedDataDefinitionsPrompt = augmentDataDefinitionsPrompt(
+            contentSettings.nsfwMode ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt),
+            { body: contentSettings.splendorMode, nsfw: contentSettings.nsfwMode }
+          );
 
           // 第2步：指令生成（CoT 自检清单已合并到 splitGenerationStep2 提示词中）
           // 注入与单步共用的硬规则：路径/数据同步/指令清单/交易/名称引用 + 结构严格性。
@@ -833,8 +837,8 @@ ${narrativeStateJson}
           const stepRules = (await getPrompt('splitGenerationStep2')).trim();
           const sections: string[] = [stepRules, RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS];
 
-          const sanitizedBusinessRulesPrompt = tavernEnv ? businessRulesPrompt : stripNsfwContent(businessRulesPrompt);
-          const sanitizedExtendedRulesPrompt = tavernEnv ? extendedRulesPrompt : stripNsfwContent(extendedRulesPrompt);
+          const sanitizedBusinessRulesPrompt = contentSettings.nsfwMode ? businessRulesPrompt : stripNsfwContent(businessRulesPrompt);
+          const sanitizedExtendedRulesPrompt = contentSettings.nsfwMode ? extendedRulesPrompt : stripNsfwContent(extendedRulesPrompt);
           sections.push(sanitizedBusinessRulesPrompt, sanitizedExtendedRulesPrompt, sanitizedDataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt);
 
           if (actionOptionsEnabled) {
@@ -1147,32 +1151,34 @@ ${userPrompt}
           }
 
           // 第2步：指令生成（CoT 自检清单已合并到 splitInitStep2 提示词中）
-          // 注意：getTavernHelper() 在网页版也不为空，环境必须用 isTavernEnv() 判断
-          const tavernEnv = isTavernEnv();
+          const contentSettings = getContentSettings();
           const stepRules = (await getPrompt('splitInitStep2')).trim();
-          const [businessRulesPrompt, extendedRulesPrompt, dataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt] = await Promise.all([
+          const [businessRulesPrompt, extendedRulesPrompt, dataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt, bodyInitRulesPrompt, nsfwBodyInitRulesPrompt] = await Promise.all([
             getPrompt('businessRules'),
             getPrompt('extendedBusinessRules'),
             getPrompt('dataDefinitions'),
             getPrompt('textFormatRules'),
-            getPrompt('worldStandards')
+            getPrompt('worldStandards'),
+            getPrompt('bodyInitRules'),
+            getPrompt('nsfwBodyInitRules')
           ]);
-          const sanitizedDataDefinitionsPrompt = tavernEnv ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt);
-          const sanitizedBusinessRulesPrompt = tavernEnv ? businessRulesPrompt : stripNsfwContent(businessRulesPrompt);
+          const sanitizedDataDefinitionsPrompt = augmentDataDefinitionsPrompt(
+            contentSettings.nsfwMode ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt),
+            { body: contentSettings.splendorMode, nsfw: contentSettings.nsfwMode }
+          );
+          const sanitizedBusinessRulesPrompt = contentSettings.nsfwMode ? businessRulesPrompt : stripNsfwContent(businessRulesPrompt);
 
           const sections: string[] = [stepRules, RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS];
 
-          // 🔥 酒馆端：注入身体数据生成要求
-          if (tavernEnv) {
-            sections.push(`## ⚠️ 酒馆端必须生成身体数据
-□ 身体：set \`角色.身体\` {身高:num(cm),体重:num(kg),体脂率:num(%),三围:{胸围,腰围,臀围},肤色,发色,瞳色,纹身与印记:[],穿刺:[],敏感点:[],开发度:{},其它:{},仪容:{品题,评分,概述,眉眼,发型,面部,感官,气质:{清纯,妖媚,性感,端庄,冷艳,灵动},衣着:[],穿搭,身材体态}}
-- 必须根据角色性别/年龄/种族填写合理的具体数值
-- 男性身高165-185cm，女性155-170cm，儿童按年龄
-- 仪容只写可见容貌、体态、衣着和气质，不写性行为；新NPC同时写入 社交.关系.{名}.仪容
-- 严禁使用占位文本或照抄示例`);
+          // 法身/仪容与 NSFW 分开，由能力开关决定
+          if (contentSettings.splendorMode && bodyInitRulesPrompt.trim()) {
+            sections.push(bodyInitRulesPrompt.trim());
+          }
+          if (contentSettings.nsfwMode && nsfwBodyInitRulesPrompt.trim()) {
+            sections.push(nsfwBodyInitRulesPrompt.trim());
           }
 
-          const sanitizedExtendedRulesPrompt = tavernEnv ? extendedRulesPrompt : stripNsfwContent(extendedRulesPrompt);
+          const sanitizedExtendedRulesPrompt = contentSettings.nsfwMode ? extendedRulesPrompt : stripNsfwContent(extendedRulesPrompt);
           sections.push(sanitizedBusinessRulesPrompt, sanitizedExtendedRulesPrompt, sanitizedDataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt);
           return sections.map(s => s.trim()).filter(Boolean).join('\n\n---\n\n').trim();
         };

@@ -1,7 +1,6 @@
 import { getPrompt } from '@/services/defaultPrompts';
-import { stripNsfwContent } from './definitions/dataDefinitions';
-import { isTavernEnv } from '@/utils/tavern';
-import { getNsfwSettingsFromStorage } from '@/utils/nsfw';
+import { stripNsfwContent, augmentDataDefinitionsPrompt } from './definitions/dataDefinitions';
+import { getContentSettings } from '@/utils/nsfw';
 import { IMAGE_PROMPT_RULES } from '@/services/imagePlaceholders';
 import { resolveImageApi } from '@/services/storyImageRunner';
 
@@ -27,7 +26,9 @@ export async function assembleSystemPrompt(
     styleNarrativePrompt,
     dataDefinitionsPrompt,
     textFormatsPrompt,
-    worldStandardsPrompt
+    worldStandardsPrompt,
+    splendorRulesPrompt,
+    nsfwRulesPrompt
   ] = await Promise.all([
     getPrompt('coreOutputRules'),
     getPrompt('businessRules'),
@@ -36,12 +37,17 @@ export async function assembleSystemPrompt(
     getPrompt('styleNarrative'),
     getPrompt('dataDefinitions'),
     getPrompt('textFormatRules'),
-    getPrompt('worldStandards')
+    getPrompt('worldStandards'),
+    getPrompt('splendorRules'),
+    getPrompt('nsfwRules')
   ]);
 
-  const tavernEnv = isTavernEnv();
-  const sanitizedDataDefinitionsPrompt = tavernEnv ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt);
-  const sanitize = (prompt: string) => (tavernEnv ? prompt : stripNsfwContent(prompt));
+  const contentSettings = getContentSettings(gameState?.系统?.配置);
+  const sanitize = (prompt: string) => (contentSettings.nsfwMode ? prompt : stripNsfwContent(prompt));
+  const sanitizedDataDefinitionsPrompt = augmentDataDefinitionsPrompt(
+    sanitize(dataDefinitionsPrompt),
+    { body: contentSettings.splendorMode, nsfw: contentSettings.nsfwMode }
+  );
   const sanitizedBusinessRulesPrompt = sanitize(businessRulesPrompt);
 
   const promptSections = [
@@ -87,29 +93,19 @@ export async function assembleSystemPrompt(
     }
   }
 
-  // 🔞 NSFW 设置（酒馆端专用）
-  if (tavernEnv) {
-    const settingsFromStore = getNsfwSettingsFromStorage();
-    const cfg = (gameState?.系统?.配置 ?? {}) as Record<string, unknown>;
-    const nsfwMode = typeof cfg.nsfwMode === 'boolean' ? cfg.nsfwMode : settingsFromStore.nsfwMode;
-    const nsfwGenderFilter =
-      typeof cfg.nsfwGenderFilter === 'string' ? cfg.nsfwGenderFilter : settingsFromStore.nsfwGenderFilter;
-    promptSections.push(
-      [
-        '# NSFW设置（酒馆端）',
-        `- nsfwMode: ${nsfwMode ? 'true' : 'false'}`,
-        `- nsfwGenderFilter: ${nsfwGenderFilter}`,
-        '- 当 nsfwMode=true 且 NPC性别符合过滤条件时，创建NPC必须生成完整私密信息(PrivacyProfile)',
-        '- 若 NPC 已存在但私密信息缺失，需用 set 写入 社交.关系.{NPC名}.私密信息 完整对象',
-        '- 当 nsfwMode=false 或 性别不匹配 时，禁止生成私密信息',
-        '',
-        '# 风华仪容（酒馆端，与私密信息分开）',
-        '- 新NPC建档时同时 set 社交.关系.{NPC名}.仪容',
-        '- 玩家开局把仪容写在 角色.身体.仪容；三围仍写在 角色.身体.三围',
-        '- 只写可见的眉眼、发型、面容、感官、体态、衣着和六维气质',
-        '- 性行为、敏感与开发度不要写入仪容',
-      ].join('\n')
-    );
+  // 风华仪容与 NSFW 分开：由能力开关决定，提示词可在提示词管理中编辑/停用
+  if (contentSettings.splendorMode) {
+    const rules = splendorRulesPrompt.trim();
+    if (rules) promptSections.push(rules);
+  }
+  if (contentSettings.nsfwMode) {
+    const raw = nsfwRulesPrompt.trim();
+    if (raw) {
+      const rendered = raw.includes('{{NSFW_GENDER_FILTER}}')
+        ? raw.replace('{{NSFW_GENDER_FILTER}}', contentSettings.nsfwGenderFilter)
+        : `${raw}\n- 当前性别过滤: ${contentSettings.nsfwGenderFilter}`;
+      promptSections.push(rendered);
+    }
   }
 
   const normalizedSections = promptSections

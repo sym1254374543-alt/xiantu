@@ -181,7 +181,7 @@ import { useGameStateStore } from '@/stores/gameStateStore';
 import { CUSTOM_ROOT, DOMAINS, typeOf, useGameVariables } from '@/composables/useGameVariables';
 import { describeVariablePath, validateVariableEdit, type VariableEditMode } from '@/utils/gameVariableEditor';
 import { getSaveDataStructureForEnv } from '@/utils/prompts/definitions/dataDefinitions';
-import { isTavernEnv } from '@/utils/tavern';
+import { getNsfwSettingsFromStorage } from '@/utils/nsfw';
 import { downloadText, localDateStamp } from '@/utils/gameDisplay';
 import { usePageActions } from '@/composables/usePageActions';
 import { askText, confirmDialog } from '@/composables/useDialog';
@@ -397,7 +397,10 @@ const removeCustom = async () => {
 
 // ─── 页头 ───
 const drawer = ref<'' | 'stats' | 'guide'>('');
-const guideText = getSaveDataStructureForEnv(isTavernEnv());
+const guideText = (() => {
+  const content = getNsfwSettingsFromStorage();
+  return getSaveDataStructureForEnv({ body: content.splendorMode, nsfw: content.nsfwMode });
+})();
 const copyGuide = async () => {
   try {
     await navigator.clipboard.writeText(guideText);

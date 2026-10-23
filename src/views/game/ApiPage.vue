@@ -142,20 +142,22 @@
               <span>次</span>
             </div>
           </div>
-          <template v-if="m.inTavern.value">
-            <div class="gm-form-row">
-              <div class="gm-form-info"><span class="gm-form-name">成人内容模式</span><span class="gm-form-desc">启用后 NPC 可能产生成人向互动内容</span></div>
-              <label class="gm-switch"><input v-model="m.nsfw.value" type="checkbox" @change="m.saveNsfw" /><span></span></label>
-            </div>
-            <div v-if="m.nsfw.value" class="gm-form-row nested">
-              <div class="gm-form-info"><span class="gm-form-name">性别偏好</span><span class="gm-form-desc">只让所选性别的 NPC 参与成人互动</span></div>
-              <select v-model="m.nsfwGender.value" class="gm-field" @change="m.saveNsfw">
-                <option value="female">仅女性</option>
-                <option value="male">仅男性</option>
-                <option value="all">不限性别</option>
-              </select>
-            </div>
-          </template>
+          <div class="gm-form-row">
+            <div class="gm-form-info"><span class="gm-form-name">外貌/仪容</span><span class="gm-form-desc">开启后生成角色与 NPC 的可见外貌、体态、衣着与气质</span></div>
+            <label class="gm-switch"><input v-model="m.splendor.value" type="checkbox" @change="m.saveNsfw" /><span></span></label>
+          </div>
+          <div class="gm-form-row">
+            <div class="gm-form-info"><span class="gm-form-name">成人内容模式</span><span class="gm-form-desc">启用后 NPC 可能产生成人向互动内容，并写入私密字段</span></div>
+            <label class="gm-switch"><input v-model="m.nsfw.value" type="checkbox" @change="m.saveNsfw" /><span></span></label>
+          </div>
+          <div v-if="m.nsfw.value" class="gm-form-row nested">
+            <div class="gm-form-info"><span class="gm-form-name">性别偏好</span><span class="gm-form-desc">只让所选性别的 NPC 参与成人互动</span></div>
+            <select v-model="m.nsfwGender.value" class="gm-field" @change="m.saveNsfw">
+              <option value="female">仅女性</option>
+              <option value="male">仅男性</option>
+              <option value="all">不限性别</option>
+            </select>
+          </div>
         </div>
 
         <!-- 功能分配 -->

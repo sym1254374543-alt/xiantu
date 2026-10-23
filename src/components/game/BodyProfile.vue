@@ -1,6 +1,6 @@
 <template>
   <div class="body-profile">
-    <p v-if="!hasAny" class="gm-muted">暂无法身数据，请在酒馆中完善角色设定。</p>
+    <p v-if="!hasAny" class="gm-muted">暂无外貌/法身数据，可在设置中开启「外貌/仪容」后重新初始化或让 AI 补充。</p>
     <template v-else>
       <div v-if="figure.length" class="bp-figure">
         <div v-for="f in figure" :key="f.label" class="bp-stat">

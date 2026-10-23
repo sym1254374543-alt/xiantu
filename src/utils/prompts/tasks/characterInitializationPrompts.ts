@@ -3,7 +3,7 @@
  *
  * 开局流程：世界生成 → 角色初始化（本文件）
  * - CHARACTER_INIT_TASK_PROMPT：开局任务说明，注册为提示词管理中的「角色初始化」（characterInit），用户可自定义
- * - TAVERN_BODY_RULES：酒馆端专属的玩家法身要求，按运行环境整块追加（不参与自定义，避免按行过滤残留半截规则）
+ * - BODY_INIT_RULES / NSFW_BODY_INIT_RULES：按能力开关追加（仪容与 NSFW 分开）
  */
 
 import type { World, TalentTier, Origin, SpiritRoot, Talent } from '@/types';
@@ -11,7 +11,7 @@ import type { WorldInfo, WorldMapConfig, SystemConfig } from '@/types/game';
 import { stripNsfwContent } from '../definitions/dataDefinitions';
 import { assembleSystemPrompt } from '../promptAssembler';
 import { getPrompt } from '@/services/defaultPrompts';
-import { isTavernEnv } from '@/utils/tavern';
+import { getNsfwSettingsFromStorage } from '@/utils/nsfw';
 
 // =====================================================================
 // 开局任务说明（每条规则只写一处）
@@ -95,19 +95,6 @@ tavern_commands 条数不设上限：剧情需要多少条就写多少条（多�
 
 原则：**忠于背景，不要"平衡"**。
 不得为迁就"新手开局"而降格；也不得凭空添加背景未提及的高阶资源。
-`.trim();
-
-/** 酒馆端专属：玩家法身数据（网页版整块不发送） */
-const TAVERN_BODY_RULES = `
-## 玩家法身（酒馆端必须执行）
-set 角色.身体 {身高,体重,体脂率,三围:{胸围,腰围,臀围},肤色,发色,瞳色,纹身与印记:[],穿刺:[],敏感点:[],开发度:{},其它:{},仪容:{品题,评分,概述,眉眼,发型,面部,感官,气质:{清纯,妖媚,性感,端庄,冷艳,灵动},衣着:[],穿搭,身材体态}}
-- 按角色性别/年龄/种族生成具体数值：身高 男165-185cm、女155-170cm、儿童按年龄；体重与身高匹配；体脂率 男10-25%、女18-30%
-- 纹身与印记/穿刺/敏感点为 []，开发度/其它为 {}
-- 仪容写可见的容貌、体态、衣着和六维气质。品题四字且贴合此人，评分 0-100，六维必须拉开差距。不写性行为
-- 女性或有胸部特征时，可在角色.身体.罩杯写单字母
-- 新NPC建档时同时 set 社交.关系.{NPC名}.仪容（结构同上，三围写在仪容里）
-- nsfwMode=true 时额外生成：胸部描述/私处描述/生殖器描述。这些敏感字段不要塞进仪容
-- 严禁占位文本（"待AI生成"/"暂无"/"空"），严禁照抄示例数值
 `.trim();
 
 
@@ -261,18 +248,21 @@ ${settings?.nsfwMode ? `- **NSFW模式**: 已开启，私密信息生成范围�
  * 构建角色初始化系统提示词：核心规则 + 开局任务（可在提示词管理中自定义）+ 酒馆端法身要求
  */
 export async function buildCharacterInitializationPrompt(): Promise<string> {
-  const tavernEnv = isTavernEnv();
-  const [basePrompt, taskPrompt] = await Promise.all([
+  const content = getNsfwSettingsFromStorage();
+  const [basePrompt, taskPrompt, bodyRules, nsfwBodyRules] = await Promise.all([
     assembleSystemPrompt([]),
     getPrompt('characterInit'),
+    getPrompt('bodyInitRules'),
+    getPrompt('nsfwBodyInitRules'),
   ]);
 
   const sections = [
     basePrompt,
     taskPrompt.trim() || CHARACTER_INIT_TASK_PROMPT,
-    tavernEnv ? TAVERN_BODY_RULES : '',
+    content.splendorMode ? bodyRules.trim() : '',
+    content.nsfwMode ? nsfwBodyRules.trim() : '',
   ].filter(Boolean);
 
   const prompt = sections.join('\n\n---\n\n');
-  return tavernEnv ? prompt : stripNsfwContent(prompt);
+  return content.nsfwMode ? prompt : stripNsfwContent(prompt);
 }

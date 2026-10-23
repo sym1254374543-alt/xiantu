@@ -669,8 +669,8 @@ export const useCharacterStore = defineStore('characterV3', () => {
         throw new Error(`角色初始化失败: ${errorMessage}`);
       }
 
-      // Tavern 兜底：确保系统NSFW配置与“角色.身体”骨架存在（避免界面不展示/路径缺失）
-      if (isTavernEnv() && initialSaveData) {
+      // 内容能力兜底：确保系统配置与“角色.身体”骨架存在（避免界面不展示/路径缺失）
+      if (initialSaveData) {
         initialSaveData = ensureSaveDataHasTavernNsfw(initialSaveData) as SaveData;
       }
 
@@ -1098,7 +1098,7 @@ export const useCharacterStore = defineStore('characterV3', () => {
       debug.log('角色商店', '将存档数据加载到 gameStateStore');
       const gameStateStore = useGameStateStore();
       if (targetSlot.存档数据) {
-        const patched = isTavernEnv() ? (ensureSaveDataHasTavernNsfw(targetSlot.存档数据) as SaveData) : targetSlot.存档数据;
+        const patched = ensureSaveDataHasTavernNsfw(targetSlot.存档数据) as SaveData;
         targetSlot.存档数据 = patched;
         gameStateStore.loadFromSaveData(patched);
         debug.log('角色商店', '✅ 存档数据已加载到 gameStateStore');
@@ -2152,7 +2152,7 @@ export const useCharacterStore = defineStore('characterV3', () => {
 
     // 🔥 关键修复：先将存档数据保存到 IndexedDB
     if (saveData.存档数据) {
-      const patched = isTavernEnv() ? (ensureSaveDataHasTavernNsfw(saveData.存档数据) as any) : saveData.存档数据;
+      const patched = ensureSaveDataHasTavernNsfw(saveData.存档数据) as any;
       const v3Data = (isSaveDataV3(patched as any) ? patched : migrateSaveDataToLatest(patched as any).migrated) as any;
       const validation = validateSaveDataV3(v3Data as any);
       if (!validation.isValid) {
@@ -2743,7 +2743,7 @@ const importCharacter = async (profileData: CharacterProfile & { _导入存档�
 
       // 将存档数据保存到 IndexedDB
       if (save.存档数据) {
-	        const patched = isTavernEnv() ? (ensureSaveDataHasTavernNsfw(save.存档数据) as any) : save.存档数据;
+	        const patched = ensureSaveDataHasTavernNsfw(save.存档数据) as any;
 	        const v3Data = (isSaveDataV3(patched as any) ? patched : migrateSaveDataToLatest(patched as any).migrated) as any;
 	        const validation = validateSaveDataV3(v3Data as any);
 	        if (!validation.isValid) {

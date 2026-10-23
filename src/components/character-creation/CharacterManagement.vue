@@ -492,7 +492,6 @@ import type { CharacterProfile, SaveSlot } from '@/types/game';
 import "@/style.css";
 import { formatRealmWithStage } from '@/utils/realmUtils';
 import { toast } from '@/utils/toast';
-import { isTavernEnv } from '@/utils/tavern';
 import { ensureSaveDataHasTavernNsfw } from '@/utils/nsfw';
 import { isSaveDataV3, migrateSaveDataToLatest } from '@/utils/saveMigration';
 import { validateSaveDataV3 } from '@/utils/saveValidationV3';
@@ -1064,7 +1063,7 @@ const exportCharacter = async (charId: string) => {
           console.warn(`[角色导出] 存档「${save.存档名}」数据为空，跳过`);
           return null;
         }
-        const patchedData = isTavernEnv() ? (ensureSaveDataHasTavernNsfw(fullData) as any) : fullData;
+        const patchedData = ensureSaveDataHasTavernNsfw(fullData) as any;
         return {
           ...save,
           存档数据: patchedData
@@ -1136,7 +1135,7 @@ const exportSingleSave = async (charId: string, slotKey: string, slot: SaveSlot)
     // 从 IndexedDB 加载完整的存档数据
     const { loadSaveData } = await import('@/utils/indexedDBManager');
     const fullSaveDataRaw = await loadSaveData(charId, slotKey);
-    const fullSaveData = isTavernEnv() ? (ensureSaveDataHasTavernNsfw(fullSaveDataRaw) as any) : fullSaveDataRaw;
+    const fullSaveData = ensureSaveDataHasTavernNsfw(fullSaveDataRaw) as any;
 
     if (!fullSaveData) {
       toast.error('无法加载存档数据');
@@ -1220,7 +1219,7 @@ const _exportSaves = async () => {
     const savesWithFullData = await Promise.all(
       saveSlots.map(async (save) => {
         const fullData = await loadSaveData(charId, save.存档名);
-        const patchedData = fullData && isTavernEnv() ? (ensureSaveDataHasTavernNsfw(fullData) as any) : fullData;
+        const patchedData = fullData ? (ensureSaveDataHasTavernNsfw(fullData) as any) : fullData;
         return {
           ...save,
           存档数据: patchedData  // 使用统一的字段名

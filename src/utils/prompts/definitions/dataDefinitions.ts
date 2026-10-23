@@ -32,15 +32,14 @@ const CHARACTER_STRUCTURE = `
 
 `
 
-/** 酒馆端专属：玩家法身结构（网页版整块不发送，避免按行过滤残留半截字段） */
-const TAVERN_BODY_STRUCTURE = `
-[角色.身体](酒馆端法身,NSFW敏感字段需nsfwMode=true)
+/** 法身/仪容结构（与 NSFW 解耦；splendorMode 开启即可发送） */
+const BODY_STRUCTURE = `
+[角色.身体](法身/外貌;私密字段仅在 nsfwMode=true 时生成)
 基础体格:身高:num(cm),体重:num(kg),体脂率?:num(%),三围:{胸围:num,腰围:num,臀围:num}
 外观细节:肤色?:str,发色?:str,瞳色?:str,纹身与印记?:[str],穿刺?:[str]
-敏感字段(仅NSFW):胸部描述?:str,私处描述?:str,生殖器描述?:str,敏感点?:[str],开发度?:{部位名:num[0-100]}
 扩展:其它?:{任意键:任意值};罩杯?:str;仪容?:Splendor
 
-[Splendor 仪容](酒馆端风华。路径:社交.关系.{NPC名}.仪容 与 角色.身体.仪容。网页端不要生成)
+[Splendor 仪容](路径:社交.关系.{NPC名}.仪容 与 角色.身体.仪容)
 品题:str(四字品评,贴合此人,禁止人人写成"国色天香");评分:num[0-100];概述:str(40字内,一眼能认出的印象)
 眉眼/发型/面部/感官:str(各一句可见特征)
 三围?:{胸围,腰围,臀围}(cm。玩家已写在角色.身体.三围时,仪容里可省略)
@@ -48,7 +47,13 @@ const TAVERN_BODY_STRUCTURE = `
 气质:{清纯,妖媚,性感,端庄,冷艳,灵动}各num[0-100],六项必须拉开差距,禁止全满或全同
 衣着:[str](身上1-4件);穿搭:str;身材体态:str
 新NPC建档、玩家开局都要写。换装或容貌变化时 set 更新对应字段。
-性行为、敏感与开发只写私密信息或角色.身体的敏感字段,不写进仪容。
+不写性行为与露骨内容。
+`
+
+/** 仅 NSFW 开启时发送的角色身体私密字段 */
+const NSFW_BODY_STRUCTURE = `
+[角色.身体·NSFW敏感字段](仅 nsfwMode=true)
+敏感字段:胸部描述?:str,私处描述?:str,生殖器描述?:str,敏感点?:[str],开发度?:{部位名:num[0-100]}
 `
 
 const DAO_STRUCTURE = `
@@ -172,13 +177,16 @@ edges:[{from:str,to:str,relation:str,score:num[-100~100],type:str,tags?:[],event
 relation类型:师徒/道侣/仇敌/盟友/竞争/暗恋/血亲/同门/上下级/债务/恩情
 type:单向|双向;score:关系强度;events:关键事件记录;updatedAt:最后更新时间
 
+`
+
+/** 仅 NSFW 开启时发送的 NPC 私密信息结构 */
+const NSFW_PRIVACY_STRUCTURE = `
 [NSFW:PrivacyProfile](路径:社交.关系.{NPC名}.私密信息)
 私密信息字段:是否为处女:bool;性格倾向/性取向/当前性状态/性经验等级/亲密节奏/亲密需求/安全偏好/体液分泌状态/避孕措施:str;性渴望程度/性交总次数:num;最近一次性行为时间:str;亲密偏好/禁忌清单/性癖好/性伴侣名单/特殊体质:[];生育状态:{是否可孕:bool;当前状态:str;妊娠月数?:num;预计分娩时间?:str};身体部位:BodyPartDevelopment[]
 
 [NSFW:BodyPartDevelopment]
 私密信息身体部位字段:部位名称:str(胸部/小穴/菊穴/嘴唇/耳朵等);敏感度:num[0-100];开发度:num[0-100];特殊印记?:str;特征描述:str;反应描述?:str;偏好刺激?:str;禁忌?:str
-
-`
+`;
 
 const MEMORY_STRUCTURE = `
 [社交.记忆](只读)
@@ -257,12 +265,44 @@ export const DATA_STRUCTURE_EXAMPLES = ``
 export function stripNsfwContent(input: string): string {
   return input
     .split('\n')
-    .filter((line) => !/nsfw|私密信息|身体部位开发|法身|角色\.身体|privacy/i.test(line))
+    .filter((line) => !/nsfw|私密信息|身体部位开发|privacy|敏感字段|胸部描述|私处描述|生殖器描述|开发度/i.test(line))
     .join('\n')
     .trim();
 }
 
-export function getSaveDataStructureForEnv(isTavern: boolean): string {
-  if (isTavern) return `${SAVE_DATA_STRUCTURE}\n\n${TAVERN_BODY_STRUCTURE.trim()}`;
-  return stripNsfwContent(SAVE_DATA_STRUCTURE);
+export function getSaveDataStructureForEnv(
+  options: boolean | { body?: boolean; nsfw?: boolean }
+): string {
+  const opts = typeof options === 'boolean' ? { body: options, nsfw: options } : options;
+  const nsfw = opts.nsfw === true;
+  const body = opts.body !== undefined ? opts.body : nsfw;
+
+  let base = SAVE_DATA_STRUCTURE;
+  if (!nsfw) base = stripNsfwContent(base);
+  if (body) base += `\n\n${BODY_STRUCTURE.trim()}`;
+  if (nsfw) base += `\n\n${NSFW_PRIVACY_STRUCTURE.trim()}`;
+  if (body && nsfw) base += `\n\n${NSFW_BODY_STRUCTURE.trim()}`;
+  return base;
+}
+
+/**
+ * 用户自定义 dataDefinitions 可能是在关闭能力时导出的，里面没有身体/私密结构。
+ * 这里按当前能力补上缺失部分，避免“开了仪容/NSFW 但 schema 里没字段”。
+ */
+export function augmentDataDefinitionsPrompt(
+  input: string,
+  options: boolean | { body?: boolean; nsfw?: boolean }
+): string {
+  const opts = typeof options === 'boolean' ? { body: options, nsfw: options } : options;
+  const nsfw = opts.nsfw === true;
+  const body = opts.body !== undefined ? opts.body : nsfw;
+  let out = input;
+  if (body && !out.includes('[角色.身体]')) {
+    out += `\n\n${BODY_STRUCTURE.trim()}`;
+  }
+  if (body && nsfw) {
+    if (!out.includes('PrivacyProfile')) out += `\n\n${NSFW_PRIVACY_STRUCTURE.trim()}`;
+    if (!out.includes('NSFW敏感字段')) out += `\n\n${NSFW_BODY_STRUCTURE.trim()}`;
+  }
+  return out;
 }
