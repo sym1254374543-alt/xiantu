@@ -297,6 +297,7 @@ ${continentList}
       }
 
       let basePrompt = defaultPrompt;
+      let customModified = false;
       // 如果用户有自定义提示词且不为空，使用自定义的
       // 注意：promptStorage.get 在用户未修改时会返回默认值，所以需要检查是否真的被修改过
       if (customPrompt && customPrompt.trim()) {
@@ -304,10 +305,31 @@ ${continentList}
         const allPrompts = await promptStorage.loadAll();
         if (allPrompts['worldGeneration']?.modified) {
           basePrompt = customPrompt;
+          customModified = true;
         }
       }
 
-      return basePrompt + injections;
+      // 自定义提示词会整体替换默认文本，导致其中的世界设定与数量变成导出时的旧值。
+      // 这里把“本次实际参数”放在最前面（与默认提示词的 ## 世界设定 位置一致），
+      // 保证自定义提示词也能拿到当前世界与数量。
+      let worldParamPrefix = '';
+      if (customModified) {
+        const onlyContinents = factionCount === 0 && locationCount === 0;
+        const lines = [
+          '## 世界设定（本次生成参数，最高优先级，覆盖后文所有旧设定与数量）',
+          this.config.worldName ? `世界名称: ${this.config.worldName}` : '',
+          this.config.worldEra ? `世界时代: ${this.config.worldEra}` : '',
+          this.config.worldBackground ? `世界背景: ${this.config.worldBackground}` : '',
+          this.config.characterBackground ? `角色出身: ${this.config.characterBackground}` : '',
+          onlyContinents
+            ? '本次只生成大洲；factions 与 locations 必须是空数组 []。'
+            : `本次数量：大洲 ${continentCount} 个 | 势力 ${factionCount} 个 | 地点 ${locationCount} 个 | 其中秘境 ${secretRealmsCount} 个`,
+          '后文若出现不同的世界设定或数量，一律以本段为准。',
+        ].filter(Boolean);
+        worldParamPrefix = `${lines.join('\n')}\n\n`;
+      }
+
+      return worldParamPrefix + basePrompt + injections;
     }
 
   /**

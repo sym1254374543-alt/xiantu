@@ -192,7 +192,7 @@ ${MODERN_EARTH_STYLE}
 - 大洲跨度约 ${continentMin}-${continentMax}
 
 ## 势力（${finalFactionCount}个）
-- 每个大洲都要有势力；位置与势力范围必须落在所属大洲边界内
+- 势力优先分布在不同大洲；若势力数少于大洲数，优先分配给重要大洲，不要求每洲都有；位置与势力范围必须落在所属大洲边界内
 - 势力范围：4-5 个点的简单多边形，按顺序排列；跨度按等级：超级≈${Math.round(territoryMax * 1.2)} | 一流≈${Math.round((territoryMin + territoryMax) / 2)} | 二流≈${Math.round(territoryMin * 0.9)} | 三流≈${Math.round(territoryMin * 0.7)}，整体约占大洲 3%-8%，不要画太大
 - **现代组织形态**：官方机构 / 财团企业 / 家族世家 / 研究所学院 / 教团结社 / 妖族（见上方世界性质）
 - 领导层（必填）：键名统一用 首领 / 首领修为 / 副手 / 副手修为
@@ -216,7 +216,7 @@ ${MODERN_EARTH_STYLE}
 - 数量分布：山川湖海${naturalLandmarks} | 城镇都市${cities} | 灵脉宝地+异变区域共${specialSites} | 凶险之地${dangerZones} | 其他特殊${otherSites}
 - 其中 ${finalSecretRealmCount} 个带特殊属性（写进"特色"数组）：机遇之地${opportunityRealms} | 传承遗迹${heritageRealms} | 危险禁地${dangerousRealms}
 - 灵气复苏后，部分真实地点发生异变（如 某地突现灵脉/凶兽出没/古遗迹显现）；描述要写得像真的新闻事件
-- 坐标落在所属大洲边界内，彼此不重叠；每个大洲都要有地点
+- 坐标落在所属大洲边界内，彼此不重叠；地点优先分布在不同大洲，数量不足时优先重要大洲
 - 相关势力：列出控制或关联的势力名（中立地点可为空数组）
 
 ## 输出结构（字段名照抄，数值与名称只是格式示意——示意用的现代名称，不要照搬）

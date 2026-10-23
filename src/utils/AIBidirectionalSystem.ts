@@ -602,7 +602,7 @@ class AIBidirectionalSystemClass {
           coreStatusSummary += `\n- 境界: ${realm.名称}-${realm.阶段} (${realm.当前进度}/${realm.下一级所需})`;
         }
 
-        if (attributes.声望) {
+        if (attributes.声望 !== undefined) {
           coreStatusSummary += `\n- 声望: ${attributes.声望}`;
         }
 
@@ -661,6 +661,7 @@ class AIBidirectionalSystemClass {
             身体: stateForAI.角色?.身体,
             背包: stateForAI.角色?.背包,
             资产: stateForAI.角色?.资产,
+            银行: stateForAI.角色?.银行,
             装备: stateForAI.角色?.装备,
             功法: stateForAI.角色?.功法,
             修炼: stateForAI.角色?.修炼,
@@ -726,6 +727,7 @@ ${stateJsonString}
 本轮**只输出一个 JSON 对象**，不要任何前后说明文字、不要代码块围栏、不要 <thinking> 标签：
 {"text":"本回合叙事正文","mid_term_memory":"50-100字本回合摘要","tavern_commands":[{"action":"add","key":"元数据.时间.分钟","value":30}],"action_options":["选项1","选项2","选项3","选项4","选项5"]}
 - 四个字段都要有；正文写在 text 里（不要在 JSON 之外直接写正文）
+- mid_term_memory：50-100字（人物多时可到150字），写清时间、地点、所有具名参与者；人名逐个写，不用"等人/众人"省略
 - 正文里的换行一律写 \n，不要直接回车
 - **正文照常写足：常规 500-1000 字**，突破/大战/关键剧情可到 1500 字。上面的示例只是**结构示意**，不是长度标准——不要因为要输出 JSON 就把正文写短
 `.trim();
@@ -859,6 +861,7 @@ ${stateJsonString}
 # 输出格式（最后一件事，务必遵守）
 只输出一个 JSON 对象，不要任何前后说明文字、不要代码块围栏、不要 <thinking> 标签，**不要输出 text 字段**（正文已由第 1 步给出）：
 {"mid_term_memory":"50-100字本回合摘要","tavern_commands":[{"action":"add","key":"元数据.时间.分钟","value":30}],"action_options":["选项1","选项2","选项3","选项4","选项5"]}
+- mid_term_memory：50-100字（人物多时可到150字），写清时间、地点、所有具名参与者；人名逐个写，不用"等人/众人"省略
 - tavern_commands 必须是数组；数值写数字（不要写 "30" 这样的字符串）
 `.trim();
         };
@@ -1965,8 +1968,9 @@ ${saveDataJson}`, role: 'system', depth: 4, position: 'in_chat' },
       const prompt = `你是记忆整理者。这是纯文本总结任务，不是续写剧情。
 
 ## 要求
-- 把下面的叙事压成 50-100 字摘要，第三人称，一到两句
-- 保留：人物、地点、关键事件与因果、物品得失、境界与关系变化
+- 把下面的叙事压成 50-100 字摘要（人物多时可到150字），第三人称，一到三句
+- 写清时间、地点、所有具名参与者；人名逐个写，不用"等人/众人"省略
+- 保留：关键事件与因果、物品得失、境界与关系变化
 - 舍去：对话原文、修辞、情绪渲染、过程细节
 - 只依据给定文本，不添加原文没有的事
 

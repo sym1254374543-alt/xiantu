@@ -47,7 +47,7 @@ import {
   PERSISTENT_STATE_RULES
 } from '@/utils/prompts/definitions/businessRules';
 // 文本格式
-import { TEXT_FORMAT_MARKERS, DICE_ROLLING_RULES, COMBAT_DAMAGE_RULES, NAMING_CONVENTIONS } from '@/utils/prompts/definitions/textFormats';
+import { TEXT_FORMAT_MARKERS, DICE_ROLLING_RULES, NAMING_CONVENTIONS } from '@/utils/prompts/definitions/textFormats';
 // 世界标准
 import { REALM_ATTRIBUTE_STANDARDS, QUALITY_SYSTEM, REPUTATION_GUIDE } from '@/utils/prompts/definitions/worldStandards';
 import { ACTION_OPTIONS_RULES } from '@/utils/prompts/definitions/actionOptions';
@@ -146,7 +146,7 @@ const EXTENDED_BUSINESS_RULES = [
 ].join('\n\n');
 
 // 合并文本格式规范
-const TEXT_FORMAT_RULES = [TEXT_FORMAT_MARKERS, DICE_ROLLING_RULES, COMBAT_DAMAGE_RULES, NAMING_CONVENTIONS].join('\n\n');
+const TEXT_FORMAT_RULES = [TEXT_FORMAT_MARKERS, DICE_ROLLING_RULES, NAMING_CONVENTIONS].join('\n\n');
 
 // 合并世界观标准
 const WORLD_STANDARDS = [REALM_ATTRIBUTE_STANDARDS, QUALITY_SYSTEM, REPUTATION_GUIDE].join('\n\n');
@@ -175,7 +175,7 @@ const SPLIT_GENERATION_STEP1_PROMPT = `
 - ✅ 〔修炼:成功,判定值:37,难度:30,基础:30,幸运:+5,环境:+2,状态:0〕（37=30+5+2+0；普通难度等于基础，不要写死35）
 - ❌ 【当前状态】气血：95/100（【】只能写环境）
 - ❌ 单独一行"系统提示：……"
-战斗中每次攻防都判定，结果决定伤害与后果（大失败≈重伤，大成功≈重创对手）
+战斗无突变时一次推进到结束；关键交手要判定，结果决定伤害与后果（大失败≈重伤，大成功≈重创对手）
 
 ## 禁止
 - 输出 text 以外的字段（mid_term_memory / tavern_commands / action_options）
@@ -207,7 +207,7 @@ const SPLIT_GENERATION_STEP2_PROMPT = `
 □ 银行卡变化 → add 角色.银行.余额.{币种ID}（**存钱进卡为正、取钱/刷卡消费为负**；现金同时反向变动）；灵石绝不入卡
 □ 非货币财产 → **新增用 push** 角色.资产.房产/车辆/持股/其他（不要整体 set，会覆盖已有条目）；改估值 set 到 [下标].估值；变卖/损毁 delete 该下标；NPC 用 社交.关系.{NPC名}.资产
 □ 物品增减 → 获得 set 完整物品对象 / 消耗 add 数量(负) / 用尽 delete（灵石也是物品：灵石_下品等）
-□ 声望变化 → add 角色.属性.声望
+□ 重大公开事件后可 add 角色.属性.声望（仅记录，不影响叙事）
 
 ### 修炼与突破
 □ 修炼 → add 角色.属性.境界.当前进度
@@ -226,7 +226,7 @@ const SPLIT_GENERATION_STEP2_PROMPT = `
 ### NPC
 □ 有名有姓、之后还会打交道的人物首次登场 → set 社交.关系.{NPC名}（完整NPCData对象）；路人不建档
 □ 好感变化 → add 社交.关系.{NPC名}.好感度
-□ 值得记住的互动 → push 社交.关系.{NPC名}.记忆
+□ 对该NPC产生较大影响的互动 → push 社交.关系.{NPC名}.记忆（写清时间/地点/所有具名参与者 + 该NPC当时的想法与情绪；日常寒暄不记）
 □ 心态/外貌/位置变化 → set 当前内心想法 / 当前外貌状态 / 当前位置
 □ 境界变化 → set 社交.关系.{NPC名}.境界 {名称,阶段}，并同步属性上限
 
@@ -235,7 +235,8 @@ const SPLIT_GENERATION_STEP2_PROMPT = `
 □ 宗门贡献 → add 社交.宗门.成员信息.贡献
 
 ## mid_term_memory
-50-100字，概括本回合关键事实：人物、地点、事件、得失、境界变化；不写对话与修辞
+50-100字（人物较多时可到150字），写清：具体时间（日期/时段）、地点、**所有具名参与者**、关键事件与得失、境界变化
+人物必须逐个写名，严禁用"xxx等人/众人/一行人"省略；不写对话与修辞
 
 ## 实时关注NPC
 名单内的NPC即使不在玩家身边，也要根据时间推移推演其动态，至少更新 当前内心想法
@@ -269,6 +270,7 @@ const SPLIT_INIT_STEP2_PROMPT = `
 只输出一个JSON对象：
 {"mid_term_memory":"50-100字开局摘要","tavern_commands":[...],"action_options":["选项1","选项2","选项3","选项4","选项5"]}
 - 不要代码块，不要JSON前后的任何文字，不要 <thinking> 等标签，不要 text 字段
+- mid_term_memory：50-100字，写清时间、地点、所有具名参与者与开局关键事件；人名逐个写，不用"等人/众人"省略
 - 开局阶段 tavern_commands 只用 set
 - key 以 元数据./角色./社交./世界./系统. 开头；占位符换成真实名称；数值写数字
 - 未启用行动选项时 action_options 输出 []
@@ -309,10 +311,12 @@ const MEMORY_SUMMARY_PROMPT = `
 这是纯文本总结任务，不是续写剧情。把下方待总结记忆压缩为一段长期记忆。
 
 ## 要求
-- 第一人称"我"（主角视角），按时间顺序，250-400字，连贯成段
+- 第一人称"我"（主角视角），按时间顺序，250-400字，连贯成段；宁可写长，也不要省略人物
+- **每件事都要写清时间、地点、所有具名参与者**；人名必须逐个写，严禁用"xxx等人/众人/一行人"省略
 - **时间要写进正文**：一条长期记忆常横跨多个时间段，每到新的时间点就点明日期（如"三月二十一日…；到四月十八日…"），
   开头再用【起始日期~结束日期】标出总跨度。这样日后才能判断每件事过去多久，而不是整段都含糊成"那时"
 - 保留：人名、地名、势力、关键事件与因果、物品得失、境界变化、重要承诺与恩怨
+- 涉及具体NPC时，用与 社交.关系.{NPC名} 一致的写法，便于与NPC记忆对应
 - 舍去：对话原文、情绪渲染、过程细节、重复信息
 - 只依据待总结记忆；存档数据仅用于核对名称，不从中补充新情节
 
@@ -330,7 +334,7 @@ const EVENT_GENERATION_PROMPT = `
 ## 要求
 - 必须波及玩家：危险、资源、人际、所在地、修炼环境、势力格局，至少一项
 - 类型从 势力变动 / 世界变革 / 异宝降世 / 秘境现世 / 人物风波 中选
-- 强度与玩家境界、声望、位置相称；涉及好友时参考其关系、好感与境界，不凭空超规格
+- 强度与玩家境界、位置相称；涉及好友时参考其关系、好感与境界，不凭空超规格
 - 写成现场快照（正在发生、刚刚发生），不要写成公告或总结
 - 人名、地名优先取自下方状态；新出现的名字要合乎世界观
 
@@ -342,7 +346,7 @@ const EVENT_GENERATION_PROMPT = `
     "事件类型": "势力变动|世界变革|异宝降世|秘境现世|人物风波",
     "事件描述": "50-120字，事件的来龙去脉与影响",
     "影响等级": "轻微|中等|重大|灾难",
-    "影响范围": "如：青云门一带 / 东荒全境",
+    "影响范围": "如：亚洲 / 全世界",
     "相关人物": ["人名"],
     "相关势力": ["势力名"],
     "事件来源": "随机"

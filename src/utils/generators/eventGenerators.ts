@@ -202,7 +202,6 @@ export async function generateWorldEvent(args: {
     const realmName = (saveData as any)?.角色?.属性?.境界?.名称 || '凡人';
     const realmStage = (saveData as any)?.角色?.属性?.境界?.阶段 || '';
     const locationDesc = (saveData as any)?.角色?.位置?.描述 || '未知';
-    const reputation = Number((saveData as any)?.角色?.属性?.声望 ?? 0);
 
     const relations = (saveData as any)?.社交?.关系 || {};
     const relationList = Object.values(relations)
@@ -226,7 +225,6 @@ export async function generateWorldEvent(args: {
 - 玩家: ${playerName}
 - 境界: ${realmName}${realmStage ? '-' + realmStage : ''}
 - 位置: ${locationDesc}
-- 声望: ${reputation}
 
 # 玩家关系（好感度Top）
 ${relationList.length ? relationList.map(r => `- ${r.名字} | 关系:${r.与玩家关系 || '未知'} | 好感:${r.好感度} | 境界:${r.境界 || '未知'}`).join('\n') : '- （暂无）'}
