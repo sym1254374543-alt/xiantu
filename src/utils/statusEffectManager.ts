@@ -5,6 +5,9 @@
 
 import type { SaveData, StatusEffect, GameTime } from '@/types/game';
 import { get, set } from 'lodash';
+import { gameTimeToTotalMinutes } from './time';
+
+export { gameTimeToTotalMinutes } from './time';
 
 /**
  * 兼容旧格式的状态效果类型
@@ -20,19 +23,6 @@ type LegacyStatusEffect = Partial<StatusEffect> & {
   duration?: string;
 };
 
-/**
- * 将时间转换为总分钟数
- * @param gameTime 时间对象
- * @returns 总分钟数
- */
-export function gameTimeToTotalMinutes(gameTime: GameTime): number {
-  const minutes = gameTime.分钟 ?? 0;
-  return gameTime.年 * 365 * 24 * 60 +
-         gameTime.月 * 30 * 24 * 60 +
-         gameTime.日 * 24 * 60 +
-         gameTime.小时 * 60 +
-         minutes;
-}
 
 /**
  * 将分钟数格式化为可读的持续时间字符串

@@ -16,7 +16,7 @@ import type { CharacterProfile, StateChangeLog, SaveData, GameTime, StateChange,
 import { updateMasteredSkills } from './masteredSkillsCalculator';
 import {  assembleSystemPrompt } from './prompts/promptAssembler';
 import { getPrompt } from '@/services/defaultPrompts';
-import { normalizeGameTime } from './time';
+import { normalizeGameTime, diffGameTimeMinutes, formatElapsedMinutes } from './time';
 import { updateStatusEffects } from './statusEffectManager';
 import { sanitizeAITextForDisplay } from '@/utils/textSanitizer';
 import { validateAndRepairNpcProfile } from '@/utils/dataValidation';
@@ -595,6 +595,14 @@ class AIBidirectionalSystemClass {
       };
 
       let coreStatusSummary = '# 角色核心状态速览\n';
+      const nowTimeForPrompt = stateForAI.元数据?.时间;
+      coreStatusSummary += `\n- 当前时间: ${this._formatGameTime(nowTimeForPrompt)}`;
+      const lastMemoryForTime = Array.isArray(shortTermMemory) ? shortTermMemory[shortTermMemory.length - 1] : '';
+      const lastMemoryTime = this._parseGameTimeFromText(lastMemoryForTime);
+      if (lastMemoryTime && nowTimeForPrompt) {
+        const elapsed = diffGameTimeMinutes(lastMemoryTime, nowTimeForPrompt);
+        coreStatusSummary += `\n- 距上一条剧情记录: ${formatElapsedMinutes(elapsed)}（上一条: ${this._formatGameTime(lastMemoryTime)}）`;
+      }
       if (attributes) {
         coreStatusSummary += `\n- 生命: 气血${attributes.气血?.当前}/${attributes.气血?.上限} 灵气${attributes.灵气?.当前}/${attributes.灵气?.上限} 神识${attributes.神识?.当前}/${attributes.神识?.上限} 寿元${attributes.寿命?.当前}/${attributes.寿命?.上限}`;
 
@@ -737,7 +745,7 @@ ${stateJsonString}
 
       const recentEventsInject = this.buildRecentEventsInject(
         shortTermMemoryForPrompt,
-        this._formatGameTime((stateForAI as any)?.元数据?.时间)
+        (stateForAI as any)?.元数据?.时间
       );
       const judgementInject: PromptInject = {
         content: formatJudgementBlock(judgementRound),
@@ -828,7 +836,7 @@ ${narrativeStateJson}
 
           const sanitizedDataDefinitionsPrompt = augmentDataDefinitionsPrompt(
             contentSettings.nsfwMode ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt),
-            { body: contentSettings.splendorMode, nsfw: contentSettings.nsfwMode }
+            { body: contentSettings.splendorMode || contentSettings.nsfwMode, nsfw: contentSettings.nsfwMode }
           );
 
           // 第2步：指令生成（CoT 自检清单已合并到 splitGenerationStep2 提示词中）
@@ -1164,14 +1172,14 @@ ${userPrompt}
           ]);
           const sanitizedDataDefinitionsPrompt = augmentDataDefinitionsPrompt(
             contentSettings.nsfwMode ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt),
-            { body: contentSettings.splendorMode, nsfw: contentSettings.nsfwMode }
+            { body: contentSettings.splendorMode || contentSettings.nsfwMode, nsfw: contentSettings.nsfwMode }
           );
           const sanitizedBusinessRulesPrompt = contentSettings.nsfwMode ? businessRulesPrompt : stripNsfwContent(businessRulesPrompt);
 
           const sections: string[] = [stepRules, RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS];
 
           // 法身/仪容与 NSFW 分开，由能力开关决定
-          if (contentSettings.splendorMode && bodyInitRulesPrompt.trim()) {
+          if ((contentSettings.splendorMode || contentSettings.nsfwMode) && bodyInitRulesPrompt.trim()) {
             sections.push(bodyInitRulesPrompt.trim());
           }
           if (contentSettings.nsfwMode && nsfwBodyInitRulesPrompt.trim()) {
@@ -1292,6 +1300,12 @@ ${step1Text}
     const minutes = this._getMinutes(gameTime);
     return `【仙道${gameTime.年}年${gameTime.月}月${gameTime.日}日 ${String(gameTime.小时).padStart(2, '0')}:${String(minutes).padStart(2, '0')}】`;
   }
+  private _parseGameTimeFromText(text: unknown): GameTime | null {
+    const s = String(text || '');
+    const m = s.match(/(\d{1,6})年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}):(\d{2})/);
+    if (!m) return null;
+    return { 年: Number(m[1]), 月: Number(m[2]), 日: Number(m[3]), 小时: Number(m[4]), 分钟: Number(m[5]) };
+  }
   public async processGmResponse(
     response: GM_Response,
     currentSaveData: SaveData,
@@ -1347,6 +1361,10 @@ ${step1Text}
     }
 
     const timePrefix = this._formatGameTime((saveData as any).元数据?.时间);
+    // 本回合写入的条目下标：时间推进后要把“开始时间”改成“回合结束时间”
+    let narrativePushIndex = -1;
+    let shortTermPushIndex = -1;
+    let implicitMidPushIndex = -1;
     const peeledNarrative = harvestStoryImages({
       text: sanitizeAITextForDisplay(response.text || '').trim(),
     });
@@ -1368,6 +1386,7 @@ ${step1Text}
           time: timePrefix,
           actionOptions: this.sanitizeActionOptionsForDisplay(response.action_options || [])
         };
+        narrativePushIndex = (saveData as any).系统.历史.叙事.length;
         (saveData as any).系统.历史.叙事.push(newNarrative);
         changes.push({
           key: `系统.历史.叙事[${(saveData as any).系统.历史.叙事.length - 1}]`,
@@ -1384,6 +1403,7 @@ ${step1Text}
         if (!(saveData as any).社交) (saveData as any).社交 = {};
         if (!(saveData as any).社交.记忆) (saveData as any).社交.记忆 = { 短期记忆: [], 中期记忆: [], 长期记忆: [], 隐式中期记忆: [] };
         if (!Array.isArray((saveData as any).社交.记忆.短期记忆)) (saveData as any).社交.记忆.短期记忆 = [];
+        shortTermPushIndex = (saveData as any).社交.记忆.短期记忆.length;
         (saveData as any).社交.记忆.短期记忆.push(`${timePrefix}${textContent}`);
       }
     }
@@ -1393,6 +1413,7 @@ ${step1Text}
       if (!(saveData as any).社交) (saveData as any).社交 = {};
       if (!(saveData as any).社交.记忆) (saveData as any).社交.记忆 = { 短期记忆: [], 中期记忆: [], 长期记忆: [], 隐式中期记忆: [] };
       if (!Array.isArray((saveData as any).社交.记忆.隐式中期记忆)) (saveData as any).社交.记忆.隐式中期记忆 = [];
+      implicitMidPushIndex = (saveData as any).社交.记忆.隐式中期记忆.length;
       (saveData as any).社交.记忆.隐式中期记忆.push(`${timePrefix}${midTermContent}`);
     }
 
@@ -1412,6 +1433,7 @@ ${step1Text}
 
       const implicitMidList = (saveData as any).社交.记忆.隐式中期记忆 as unknown[];
       const slotIndex = implicitMidList.length;
+      implicitMidPushIndex = slotIndex;
       implicitMidList.push(`${timePrefix}${textContent}`);
 
       // 无指令的回合不会被落盘（见后面 tavern_commands 为空时的提前返回），补摘要没有意义
@@ -1681,6 +1703,32 @@ ${step1Text}
 
     if ((saveData as any).元数据?.时间) {
       (saveData as any).元数据.时间 = normalizeGameTime((saveData as any).元数据.时间);
+    }
+
+    // 本回合可能推进了时间：把本回合写入的记忆/叙事从“开始时间”改成“结束时间”，
+    // 这样下一回合计算“距上一条记录”时不会把整段剧情时长重复算进去。
+    if ((saveData as any).元数据?.时间) {
+      const endTimePrefix = this._formatGameTime((saveData as any).元数据.时间);
+      if (endTimePrefix !== timePrefix) {
+        const rePrefix = (v: unknown): unknown =>
+          typeof v === 'string' && v.startsWith(timePrefix)
+            ? `${endTimePrefix}${v.slice(timePrefix.length)}`
+            : v;
+        const narrative = (saveData as any).系统?.历史?.叙事;
+        if (narrativePushIndex >= 0 && Array.isArray(narrative) && narrative[narrativePushIndex]) {
+          const item = narrative[narrativePushIndex];
+          item.content = rePrefix(item.content);
+          item.time = endTimePrefix;
+        }
+        const shortTerm = (saveData as any).社交?.记忆?.短期记忆;
+        if (shortTermPushIndex >= 0 && Array.isArray(shortTerm)) {
+          shortTerm[shortTermPushIndex] = rePrefix(shortTerm[shortTermPushIndex]);
+        }
+        const implicitMid = (saveData as any).社交?.记忆?.隐式中期记忆;
+        if (implicitMidPushIndex >= 0 && Array.isArray(implicitMid)) {
+          implicitMid[implicitMidPushIndex] = rePrefix(implicitMid[implicitMidPushIndex]);
+        }
+      }
     }
 
     // 每次AI响应后，检查并移除过期的状态效果
@@ -2989,15 +3037,21 @@ ${text}`;
   }
 
   /** 「最近事件」注入：把短期记忆作为 assistant 消息发送，保证剧情衔接 */
-  private buildRecentEventsInject(shortTermMemory: string[], nowText?: string): PromptInject | null {
+  private buildRecentEventsInject(shortTermMemory: string[], nowTime?: GameTime): PromptInject | null {
     if (!shortTermMemory.length) return null;
-    const nowLine = nowText ? `\n当前时间：${nowText}` : '';
+    const nowText = nowTime ? this._formatGameTime(nowTime) : '';
+    const last = this._parseGameTimeFromText(shortTermMemory[shortTermMemory.length - 1]);
+    const elapsedLine = last && nowTime
+      ? `\n距最后一条记录：${formatElapsedMinutes(diffGameTimeMinutes(last, nowTime))}`
+      : '';
     return {
       content: `# 【最近事件】
-${shortTermMemory.join('\n')}${nowLine}
+${shortTermMemory.join('\n')}
+${nowText ? `\n当前时间：${nowText}` : ''}${elapsedLine}
 
-以上是最近发生的剧情，每条开头的【】就是它的发生时间。
-写下一段之前，先按「当前时间」判断距最后一条过去了多久：间隔很短就无缝衔接；间隔较长（数小时/数天/数月）就在叙事里自然交代时间已经过去，不要一律当成刚刚发生。
+以上是最近发生的剧情，每条开头的【】是该回合的记录时间（回合结束时）。
+「距最后一条记录」已经由系统算好，直接使用这个数值，不要自己再做日期加减。
+间隔很短就无缝衔接；间隔较长（数小时/数天/数月）就在叙事里自然交代时间已经过去，不要一律当成刚刚发生。
 衔接要求：承接前文，不重复已写内容，不与之矛盾。`,
       role: 'assistant',
       depth: 2,

@@ -422,7 +422,7 @@ export function getSystemPrompts(): Record<string, PromptDefinition> {
     },
     dataDefinitions: {
       name: '3. 数据结构',
-      content: getSaveDataStructureForEnv({ body: contentSettings.splendorMode, nsfw: contentSettings.nsfwMode }),
+      content: getSaveDataStructureForEnv({ body: contentSettings.splendorMode || contentSettings.nsfwMode, nsfw: contentSettings.nsfwMode }),
       category: 'coreRequest',
       description: '存档结构定义',
       order: 3,

@@ -42,17 +42,34 @@ export function getNsfwSettingsFromStorage(): ContentSettings {
   return defaults;
 }
 
-/** 存档里的系统配置优先，其次本地设置 */
+/** 设置页写入的本地开关优先；存档系统配置只作旧存档兜底 */
 export function getContentSettings(systemConfig?: unknown): ContentSettings {
   const stored = getNsfwSettingsFromStorage();
   const cfg = systemConfig && typeof systemConfig === 'object' ? (systemConfig as Record<string, unknown>) : {};
+  let raw: Record<string, unknown> = {};
+  try {
+    const parsed = JSON.parse(localStorage.getItem('dad_game_settings') || '{}');
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) raw = parsed;
+  } catch {
+    // ignore
+  }
+
+  const pickBool = (rawKey: string, cfgValue: unknown, fallback: boolean): boolean => {
+    if (typeof raw[rawKey] === 'boolean') return raw[rawKey] as boolean;
+    if (typeof cfgValue === 'boolean') return cfgValue;
+    return fallback;
+  };
+
+  const gender = raw.nsfwGenderFilter;
   return {
-    nsfwMode: typeof cfg.nsfwMode === 'boolean' ? cfg.nsfwMode : stored.nsfwMode,
+    nsfwMode: pickBool('enableNsfwMode', cfg.nsfwMode, stored.nsfwMode),
     nsfwGenderFilter:
-      cfg.nsfwGenderFilter === 'all' || cfg.nsfwGenderFilter === 'male' || cfg.nsfwGenderFilter === 'female'
-        ? cfg.nsfwGenderFilter
-        : stored.nsfwGenderFilter,
-    splendorMode: typeof cfg.splendorMode === 'boolean' ? cfg.splendorMode : stored.splendorMode,
+      gender === 'all' || gender === 'male' || gender === 'female'
+        ? gender
+        : cfg.nsfwGenderFilter === 'all' || cfg.nsfwGenderFilter === 'male' || cfg.nsfwGenderFilter === 'female'
+          ? cfg.nsfwGenderFilter
+          : stored.nsfwGenderFilter,
+    splendorMode: pickBool('enableSplendorMode', cfg.splendorMode, stored.splendorMode),
   };
 }
 

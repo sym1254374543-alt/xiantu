@@ -46,7 +46,7 @@ export async function assembleSystemPrompt(
   const sanitize = (prompt: string) => (contentSettings.nsfwMode ? prompt : stripNsfwContent(prompt));
   const sanitizedDataDefinitionsPrompt = augmentDataDefinitionsPrompt(
     sanitize(dataDefinitionsPrompt),
-    { body: contentSettings.splendorMode, nsfw: contentSettings.nsfwMode }
+    { body: contentSettings.splendorMode || contentSettings.nsfwMode, nsfw: contentSettings.nsfwMode }
   );
   const sanitizedBusinessRulesPrompt = sanitize(businessRulesPrompt);
 

@@ -259,7 +259,7 @@ export async function buildCharacterInitializationPrompt(): Promise<string> {
   const sections = [
     basePrompt,
     taskPrompt.trim() || CHARACTER_INIT_TASK_PROMPT,
-    content.splendorMode ? bodyRules.trim() : '',
+    content.splendorMode || content.nsfwMode ? bodyRules.trim() : '',
     content.nsfwMode ? nsfwBodyRules.trim() : '',
   ].filter(Boolean);
 
