@@ -596,12 +596,14 @@ class AIBidirectionalSystemClass {
 
       let coreStatusSummary = '# 角色核心状态速览\n';
       const nowTimeForPrompt = stateForAI.元数据?.时间;
-      coreStatusSummary += `\n- 当前时间: ${this._formatGameTime(nowTimeForPrompt)}`;
+      coreStatusSummary += `\n- 本回合起点(上回合结束时间): ${this._formatGameTime(nowTimeForPrompt)}`;
       const lastMemoryForTime = Array.isArray(shortTermMemory) ? shortTermMemory[shortTermMemory.length - 1] : '';
-      const lastMemoryTime = this._parseGameTimeFromText(lastMemoryForTime);
-      if (lastMemoryTime && nowTimeForPrompt) {
-        const elapsed = diffGameTimeMinutes(lastMemoryTime, nowTimeForPrompt);
-        coreStatusSummary += `\n- 距上一条剧情记录: ${formatElapsedMinutes(elapsed)}（上一条: ${this._formatGameTime(lastMemoryTime)}）`;
+      const lastStart = this._parseGameTimeFromText(lastMemoryForTime);
+      if (lastStart && nowTimeForPrompt) {
+        // 记忆时间戳是回合开始；本回合起点就是上一回合结束。
+        const duration = diffGameTimeMinutes(lastStart, nowTimeForPrompt);
+        coreStatusSummary += `\n- 上一条记录开始于: ${this._formatGameTime(lastStart)}`;
+        coreStatusSummary += `\n- 上一条记录所在回合跨度: ${this._formatGameTimeSpan(lastStart, nowTimeForPrompt)}（历时 ${formatElapsedMinutes(duration)}）`;
       }
       if (attributes) {
         coreStatusSummary += `\n- 生命: 气血${attributes.气血?.当前}/${attributes.气血?.上限} 灵气${attributes.灵气?.当前}/${attributes.灵气?.上限} 神识${attributes.神识?.当前}/${attributes.神识?.上限} 寿元${attributes.寿命?.当前}/${attributes.寿命?.上限}`;
@@ -736,7 +738,7 @@ ${stateJsonString}
 本轮**只输出一个 JSON 对象**，不要任何前后说明文字、不要代码块围栏、不要 <thinking> 标签：
 {"text":"本回合叙事正文","mid_term_memory":"50-100字本回合摘要","tavern_commands":[{"action":"add","key":"元数据.时间.分钟","value":30}],"action_options":["选项1","选项2","选项3","选项4","选项5"]}
 - 四个字段都要有；正文写在 text 里（不要在 JSON 之外直接写正文）
-- mid_term_memory：50-100字（人物多时可到150字），写清时间、地点、所有具名参与者；人名逐个写，不用"等人/众人"省略
+- mid_term_memory：50-100字（人物多时可到150字），写清时间、地点、所有具名参与者；人名逐个写，不用"等人/众人"省略；跨多段时间时写成时间线（时间点1→事件1；时间点2→事件2…）
 - 正文里的换行一律写 \n，不要直接回车
 - **正文照常写足：常规 500-1000 字**，突破/大战/关键剧情可到 1500 字。上面的示例只是**结构示意**，不是长度标准——不要因为要输出 JSON 就把正文写短
 `.trim();
@@ -873,7 +875,7 @@ ${stateJsonString}
 # 输出格式（最后一件事，务必遵守）
 只输出一个 JSON 对象，不要任何前后说明文字、不要代码块围栏、不要 <thinking> 标签，**不要输出 text 字段**（正文已由第 1 步给出）：
 {"mid_term_memory":"50-100字本回合摘要","tavern_commands":[{"action":"add","key":"元数据.时间.分钟","value":30}],"action_options":["选项1","选项2","选项3","选项4","选项5"]}
-- mid_term_memory：50-100字（人物多时可到150字），写清时间、地点、所有具名参与者；人名逐个写，不用"等人/众人"省略
+- mid_term_memory：50-100字（人物多时可到150字），写清时间、地点、所有具名参与者；人名逐个写，不用"等人/众人"省略；跨多段时间时写成时间线（时间点1→事件1；时间点2→事件2…）
 - tavern_commands 必须是数组；数值写数字（不要写 "30" 这样的字符串）
 `.trim();
         };
@@ -1300,6 +1302,12 @@ ${step1Text}
     const minutes = this._getMinutes(gameTime);
     return `【仙道${gameTime.年}年${gameTime.月}月${gameTime.日}日 ${String(gameTime.小时).padStart(2, '0')}:${String(minutes).padStart(2, '0')}】`;
   }
+  private _formatGameTimeSpan(start: GameTime | undefined, end: GameTime | undefined): string {
+    const a = this._formatGameTime(start);
+    const b = this._formatGameTime(end);
+    if (!start || !end || a === b) return a;
+    return `【${a.slice(1, -1)}→${b.slice(1, -1)}】`;
+  }
   private _parseGameTimeFromText(text: unknown): GameTime | null {
     const s = String(text || '');
     const m = s.match(/(\d{1,6})年(\d{1,2})月(\d{1,2})日\s*(\d{1,2}):(\d{2})/);
@@ -1361,10 +1369,6 @@ ${step1Text}
     }
 
     const timePrefix = this._formatGameTime((saveData as any).元数据?.时间);
-    // 本回合写入的条目下标：时间推进后要把“开始时间”改成“回合结束时间”
-    let narrativePushIndex = -1;
-    let shortTermPushIndex = -1;
-    let implicitMidPushIndex = -1;
     const peeledNarrative = harvestStoryImages({
       text: sanitizeAITextForDisplay(response.text || '').trim(),
     });
@@ -1386,7 +1390,6 @@ ${step1Text}
           time: timePrefix,
           actionOptions: this.sanitizeActionOptionsForDisplay(response.action_options || [])
         };
-        narrativePushIndex = (saveData as any).系统.历史.叙事.length;
         (saveData as any).系统.历史.叙事.push(newNarrative);
         changes.push({
           key: `系统.历史.叙事[${(saveData as any).系统.历史.叙事.length - 1}]`,
@@ -1403,7 +1406,6 @@ ${step1Text}
         if (!(saveData as any).社交) (saveData as any).社交 = {};
         if (!(saveData as any).社交.记忆) (saveData as any).社交.记忆 = { 短期记忆: [], 中期记忆: [], 长期记忆: [], 隐式中期记忆: [] };
         if (!Array.isArray((saveData as any).社交.记忆.短期记忆)) (saveData as any).社交.记忆.短期记忆 = [];
-        shortTermPushIndex = (saveData as any).社交.记忆.短期记忆.length;
         (saveData as any).社交.记忆.短期记忆.push(`${timePrefix}${textContent}`);
       }
     }
@@ -1413,7 +1415,6 @@ ${step1Text}
       if (!(saveData as any).社交) (saveData as any).社交 = {};
       if (!(saveData as any).社交.记忆) (saveData as any).社交.记忆 = { 短期记忆: [], 中期记忆: [], 长期记忆: [], 隐式中期记忆: [] };
       if (!Array.isArray((saveData as any).社交.记忆.隐式中期记忆)) (saveData as any).社交.记忆.隐式中期记忆 = [];
-      implicitMidPushIndex = (saveData as any).社交.记忆.隐式中期记忆.length;
       (saveData as any).社交.记忆.隐式中期记忆.push(`${timePrefix}${midTermContent}`);
     }
 
@@ -1433,7 +1434,6 @@ ${step1Text}
 
       const implicitMidList = (saveData as any).社交.记忆.隐式中期记忆 as unknown[];
       const slotIndex = implicitMidList.length;
-      implicitMidPushIndex = slotIndex;
       implicitMidList.push(`${timePrefix}${textContent}`);
 
       // 无指令的回合不会被落盘（见后面 tavern_commands 为空时的提前返回），补摘要没有意义
@@ -1703,32 +1703,6 @@ ${step1Text}
 
     if ((saveData as any).元数据?.时间) {
       (saveData as any).元数据.时间 = normalizeGameTime((saveData as any).元数据.时间);
-    }
-
-    // 本回合可能推进了时间：把本回合写入的记忆/叙事从“开始时间”改成“结束时间”，
-    // 这样下一回合计算“距上一条记录”时不会把整段剧情时长重复算进去。
-    if ((saveData as any).元数据?.时间) {
-      const endTimePrefix = this._formatGameTime((saveData as any).元数据.时间);
-      if (endTimePrefix !== timePrefix) {
-        const rePrefix = (v: unknown): unknown =>
-          typeof v === 'string' && v.startsWith(timePrefix)
-            ? `${endTimePrefix}${v.slice(timePrefix.length)}`
-            : v;
-        const narrative = (saveData as any).系统?.历史?.叙事;
-        if (narrativePushIndex >= 0 && Array.isArray(narrative) && narrative[narrativePushIndex]) {
-          const item = narrative[narrativePushIndex];
-          item.content = rePrefix(item.content);
-          item.time = endTimePrefix;
-        }
-        const shortTerm = (saveData as any).社交?.记忆?.短期记忆;
-        if (shortTermPushIndex >= 0 && Array.isArray(shortTerm)) {
-          shortTerm[shortTermPushIndex] = rePrefix(shortTerm[shortTermPushIndex]);
-        }
-        const implicitMid = (saveData as any).社交?.记忆?.隐式中期记忆;
-        if (implicitMidPushIndex >= 0 && Array.isArray(implicitMid)) {
-          implicitMid[implicitMidPushIndex] = rePrefix(implicitMid[implicitMidPushIndex]);
-        }
-      }
     }
 
     // 每次AI响应后，检查并移除过期的状态效果
@@ -3040,17 +3014,20 @@ ${text}`;
   private buildRecentEventsInject(shortTermMemory: string[], nowTime?: GameTime): PromptInject | null {
     if (!shortTermMemory.length) return null;
     const nowText = nowTime ? this._formatGameTime(nowTime) : '';
-    const last = this._parseGameTimeFromText(shortTermMemory[shortTermMemory.length - 1]);
-    const elapsedLine = last && nowTime
-      ? `\n距最后一条记录：${formatElapsedMinutes(diffGameTimeMinutes(last, nowTime))}`
+    const lastStart = this._parseGameTimeFromText(shortTermMemory[shortTermMemory.length - 1]);
+    const lastLine = lastStart && nowTime
+      ? `\n上一条记录开始于：${this._formatGameTime(lastStart)}`
+        + `\n上一条记录所在回合跨度：${this._formatGameTimeSpan(lastStart, nowTime)}（历时 ${formatElapsedMinutes(diffGameTimeMinutes(lastStart, nowTime))}）`
       : '';
     return {
       content: `# 【最近事件】
 ${shortTermMemory.join('\n')}
-${nowText ? `\n当前时间：${nowText}` : ''}${elapsedLine}
+${nowText ? `\n本回合起点(上回合结束时间)：${nowText}` : ''}${lastLine}
 
-以上是最近发生的剧情，每条开头的【】是该回合的记录时间（回合结束时）。
-「距最后一条记录」已经由系统算好，直接使用这个数值，不要自己再做日期加减。
+以上是最近发生的剧情，每条开头的【】是该回合的开始时间；回合内经历了多久、分几段，写在记录正文的时间线里。
+「上一条记录所在回合跨度」已经由系统算好，直接使用，不要自己再做日期加减。
+判断某事过去多久时：先看正文时间线里的具体时间点，再对照本回合起点；不要只按开头时间算。
+本回合叙事如果跨越多段时间/多天，时间推进必须写总耗时或最终时间点，不能只写其中一段。
 间隔很短就无缝衔接；间隔较长（数小时/数天/数月）就在叙事里自然交代时间已经过去，不要一律当成刚刚发生。
 衔接要求：承接前文，不重复已写内容，不与之矛盾。`,
       role: 'assistant',
