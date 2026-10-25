@@ -897,7 +897,11 @@ ${narrativeStateJson}
 
           const sanitizedDataDefinitionsPrompt = augmentDataDefinitionsPrompt(
             contentSettings.nsfwMode ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt),
-            { body: contentSettings.splendorMode || contentSettings.nsfwMode, nsfw: contentSettings.nsfwMode }
+            {
+              body: contentSettings.splendorMode || contentSettings.nsfwMode,
+              nsfw: contentSettings.nsfwMode,
+              splendor: contentSettings.splendorMode
+            }
           );
 
           // 第2步：指令生成（CoT 自检清单已合并到 splitGenerationStep2 提示词中）
@@ -1222,18 +1226,23 @@ ${userPrompt}
           // 第2步：指令生成（CoT 自检清单已合并到 splitInitStep2 提示词中）
           const contentSettings = getContentSettings();
           const stepRules = (await getPrompt('splitInitStep2')).trim();
-          const [businessRulesPrompt, extendedRulesPrompt, dataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt, bodyInitRulesPrompt, nsfwBodyInitRulesPrompt] = await Promise.all([
+          const [businessRulesPrompt, extendedRulesPrompt, dataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt, bodyInitRulesPrompt, splendorInitRulesPrompt, nsfwBodyInitRulesPrompt] = await Promise.all([
             getPrompt('businessRules'),
             getPrompt('extendedBusinessRules'),
             getPrompt('dataDefinitions'),
             getPrompt('textFormatRules'),
             getPrompt('worldStandards'),
             getPrompt('bodyInitRules'),
+            getPrompt('splendorInitRules'),
             getPrompt('nsfwBodyInitRules')
           ]);
           const sanitizedDataDefinitionsPrompt = augmentDataDefinitionsPrompt(
             contentSettings.nsfwMode ? dataDefinitionsPrompt : stripNsfwContent(dataDefinitionsPrompt),
-            { body: contentSettings.splendorMode || contentSettings.nsfwMode, nsfw: contentSettings.nsfwMode }
+            {
+              body: contentSettings.splendorMode || contentSettings.nsfwMode,
+              nsfw: contentSettings.nsfwMode,
+              splendor: contentSettings.splendorMode
+            }
           );
           const sanitizedBusinessRulesPrompt = contentSettings.nsfwMode ? businessRulesPrompt : stripNsfwContent(businessRulesPrompt);
 
@@ -1242,6 +1251,9 @@ ${userPrompt}
           // 法身/仪容与 NSFW 分开，由能力开关决定
           if ((contentSettings.splendorMode || contentSettings.nsfwMode) && bodyInitRulesPrompt.trim()) {
             sections.push(bodyInitRulesPrompt.trim());
+          }
+          if (contentSettings.splendorMode && splendorInitRulesPrompt.trim()) {
+            sections.push(splendorInitRulesPrompt.trim());
           }
           if (contentSettings.nsfwMode && nsfwBodyInitRulesPrompt.trim()) {
             sections.push(nsfwBodyInitRulesPrompt.trim());

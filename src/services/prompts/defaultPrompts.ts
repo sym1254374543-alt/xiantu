@@ -56,7 +56,7 @@ import { EVENT_SYSTEM_RULES } from '@/utils/prompts/definitions/eventSystemRules
 import { PLAYER_PERSONALITY_RULES } from '@/utils/prompts/definitions/playerPersonality';
 import { NARRATIVE_PRESETS } from '@/data/stylePresets';
 import { NPC_RELATION_NETWORK_RULES, NPC_RELATION_COMMANDS, NPC_FACTION_RULES } from '@/utils/prompts/definitions/npcRelationRules';
-import { SPLENDOR_RULES, NSFW_RULES_TEMPLATE, BODY_INIT_RULES, NSFW_BODY_INIT_RULES } from '@/utils/prompts/definitions/contentRules';
+import { SPLENDOR_RULES, NSFW_RULES_TEMPLATE, BODY_INIT_RULES, SPLENDOR_INIT_RULES, NSFW_BODY_INIT_RULES } from '@/utils/prompts/definitions/contentRules';
 
 export interface PromptDefinition {
   name: string;
@@ -425,7 +425,11 @@ export function getSystemPrompts(): Record<string, PromptDefinition> {
     },
     dataDefinitions: {
       name: '3. 数据结构',
-      content: getSaveDataStructureForEnv({ body: contentSettings.splendorMode || contentSettings.nsfwMode, nsfw: contentSettings.nsfwMode }),
+      content: getSaveDataStructureForEnv({
+        body: contentSettings.splendorMode || contentSettings.nsfwMode,
+        nsfw: contentSettings.nsfwMode,
+        splendor: contentSettings.splendorMode
+      }),
       category: 'coreRequest',
       description: '存档结构定义',
       order: 3,
@@ -579,6 +583,15 @@ export function getSystemPrompts(): Record<string, PromptDefinition> {
       category: 'initialization',
       description: '开局生成私密字段（仅 nsfwMode）',
       order: 4,
+      weight: 6,
+      defaultEnabled: true
+    },
+    splendorInitRules: {
+      name: '17. 开局仪容',
+      content: SPLENDOR_INIT_RULES,
+      category: 'initialization',
+      description: '开局生成玩家与 NPC 仪容（仅 splendorMode）',
+      order: 5,
       weight: 6,
       defaultEnabled: true
     },

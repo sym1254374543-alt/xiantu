@@ -249,10 +249,11 @@ ${settings?.nsfwMode ? `- **NSFW模式**: 已开启，私密信息生成范围�
  */
 export async function buildCharacterInitializationPrompt(): Promise<string> {
   const content = getNsfwSettingsFromStorage();
-  const [basePrompt, taskPrompt, bodyRules, nsfwBodyRules] = await Promise.all([
+  const [basePrompt, taskPrompt, bodyRules, splendorRules, nsfwBodyRules] = await Promise.all([
     assembleSystemPrompt([]),
     getPrompt('characterInit'),
     getPrompt('bodyInitRules'),
+    getPrompt('splendorInitRules'),
     getPrompt('nsfwBodyInitRules'),
   ]);
 
@@ -260,6 +261,7 @@ export async function buildCharacterInitializationPrompt(): Promise<string> {
     basePrompt,
     taskPrompt.trim() || CHARACTER_INIT_TASK_PROMPT,
     content.splendorMode || content.nsfwMode ? bodyRules.trim() : '',
+    content.splendorMode ? splendorRules.trim() : '',
     content.nsfwMode ? nsfwBodyRules.trim() : '',
   ].filter(Boolean);
 

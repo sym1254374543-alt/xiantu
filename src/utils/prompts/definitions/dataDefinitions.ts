@@ -32,13 +32,16 @@ const CHARACTER_STRUCTURE = `
 
 `
 
-/** 法身/仪容结构（与 NSFW 解耦；splendorMode 开启即可发送） */
+/** 法身基础结构（仪容单独控制；私密字段由 NSFW 控制） */
 const BODY_STRUCTURE = `
 [角色.身体](法身/外貌;私密字段仅在 nsfwMode=true 时生成)
 基础体格:身高:num(cm),体重:num(kg),体脂率?:num(%),三围:{胸围:num,腰围:num,臀围:num}
 外观细节:肤色?:str,发色?:str,瞳色?:str,纹身与印记?:[str],穿刺?:[str]
-扩展:其它?:{任意键:任意值};罩杯?:str;仪容?:Splendor
+扩展:其它?:{任意键:任意值};罩杯?:str
+`
 
+/** 仅「外貌/仪容」开启时发送 */
+const SPLENDOR_STRUCTURE = `
 [Splendor 仪容](路径:社交.关系.{NPC名}.仪容 与 角色.身体.仪容)
 品题:str(四字品评,贴合此人,禁止人人写成"国色天香");评分:num[0-100];概述:str(40字内,一眼能认出的印象)
 眉眼/发型/面部/感官:str(各一句可见特征)
@@ -271,15 +274,17 @@ export function stripNsfwContent(input: string): string {
 }
 
 export function getSaveDataStructureForEnv(
-  options: boolean | { body?: boolean; nsfw?: boolean }
+  options: boolean | { body?: boolean; nsfw?: boolean; splendor?: boolean }
 ): string {
-  const opts = typeof options === 'boolean' ? { body: options, nsfw: options } : options;
+  const opts = typeof options === 'boolean' ? { body: options, nsfw: options, splendor: options } : options;
   const nsfw = opts.nsfw === true;
   const body = opts.body !== undefined ? opts.body : nsfw;
+  const splendor = opts.splendor !== undefined ? opts.splendor : body;
 
   let base = SAVE_DATA_STRUCTURE;
   if (!nsfw) base = stripNsfwContent(base);
   if (body) base += `\n\n${BODY_STRUCTURE.trim()}`;
+  if (body && splendor) base += `\n\n${SPLENDOR_STRUCTURE.trim()}`;
   if (nsfw) base += `\n\n${NSFW_PRIVACY_STRUCTURE.trim()}`;
   if (body && nsfw) base += `\n\n${NSFW_BODY_STRUCTURE.trim()}`;
   return base;
@@ -291,14 +296,18 @@ export function getSaveDataStructureForEnv(
  */
 export function augmentDataDefinitionsPrompt(
   input: string,
-  options: boolean | { body?: boolean; nsfw?: boolean }
+  options: boolean | { body?: boolean; nsfw?: boolean; splendor?: boolean }
 ): string {
-  const opts = typeof options === 'boolean' ? { body: options, nsfw: options } : options;
+  const opts = typeof options === 'boolean' ? { body: options, nsfw: options, splendor: options } : options;
   const nsfw = opts.nsfw === true;
   const body = opts.body !== undefined ? opts.body : nsfw;
+  const splendor = opts.splendor !== undefined ? opts.splendor : body;
   let out = input;
   if (body && !out.includes('[角色.身体]')) {
     out += `\n\n${BODY_STRUCTURE.trim()}`;
+  }
+  if (body && splendor && !out.includes('[Splendor 仪容]')) {
+    out += `\n\n${SPLENDOR_STRUCTURE.trim()}`;
   }
   if (body && nsfw) {
     if (!out.includes('PrivacyProfile')) out += `\n\n${NSFW_PRIVACY_STRUCTURE.trim()}`;

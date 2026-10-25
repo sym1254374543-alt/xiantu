@@ -399,7 +399,11 @@ const removeCustom = async () => {
 const drawer = ref<'' | 'stats' | 'guide'>('');
 const guideText = (() => {
   const content = getNsfwSettingsFromStorage();
-  return getSaveDataStructureForEnv({ body: content.splendorMode, nsfw: content.nsfwMode });
+  return getSaveDataStructureForEnv({
+    body: content.splendorMode || content.nsfwMode,
+    nsfw: content.nsfwMode,
+    splendor: content.splendorMode
+  });
 })();
 const copyGuide = async () => {
   try {
