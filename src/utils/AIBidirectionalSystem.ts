@@ -61,6 +61,65 @@ function looksLikeNarrative(s: string): boolean {
 
 const emptyGmResponse = (): GM_Response => ({ text: '', mid_term_memory: '', tavern_commands: [], action_options: [] });
 
+/** 位置路径拆分：用于判断 NPC 是否与玩家在同一场景 */
+function splitLocationPath(desc: unknown): string[] {
+  return String(desc || '')
+    .split(/[·\-—→>＞/]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
+/** 同一场景：路径前 3 段一致（大陆·城市·场所）；段数不足时比较已有段 */
+function isSameScene(playerLocation: unknown, npcLocation: unknown): boolean {
+  const a = splitLocationPath(playerLocation);
+  const b = splitLocationPath(npcLocation);
+  if (!a.length || !b.length) return false;
+  const n = Math.min(3, a.length, b.length);
+  return a.slice(0, n).every((part, i) => part === b[i]);
+}
+
+function isFocusedNpc(npc: any): boolean {
+  const flag = npc?.实时关注;
+  return flag === true || flag === 1 || flag === 'true' || flag === 'True' || flag === 'TRUE' || flag === '是';
+}
+
+/**
+ * 发给 AI 的 NPC 视图：
+ * - 实时关注 / 当前场景：完整档案；但非实时关注的记忆只带最近 1 条
+ * - 其他：名字、关系、好感、境界、位置、最近 1 条记忆
+ */
+function compactRelationsForPrompt(relations: unknown, playerLocation: unknown): Record<string, unknown> {
+  if (!relations || typeof relations !== 'object' || Array.isArray(relations)) return {};
+  const out: Record<string, unknown> = {};
+  for (const [name, npc] of Object.entries(relations as Record<string, any>)) {
+    if (!npc || typeof npc !== 'object' || Array.isArray(npc)) {
+      out[name] = npc;
+      continue;
+    }
+    const focused = isFocusedNpc(npc);
+    const sameScene = isSameScene(playerLocation, npc.当前位置?.描述);
+    const memories = Array.isArray(npc.记忆) ? npc.记忆 : [];
+    if (focused || sameScene) {
+      const copy: Record<string, any> = { ...npc };
+      if (!focused) {
+        copy.记忆 = memories.slice(-1);
+        if (Array.isArray(copy.记忆总结)) copy.记忆总结 = copy.记忆总结.slice(-1);
+      }
+      out[name] = copy;
+    } else {
+      out[name] = {
+        名字: npc.名字 || name,
+        与玩家关系: npc.与玩家关系,
+        好感度: npc.好感度,
+        境界: npc.境界,
+        当前位置: npc.当前位置,
+        记忆: memories.slice(-1),
+      };
+    }
+  }
+  return out;
+}
+
 /** 记忆中心「自定义中期 / 长期记忆格式」（留空返回空字符串） */
 function readMemoryFormatSetting(key: 'midTermFormat' | 'longTermFormat'): string {
   try {
@@ -680,7 +739,7 @@ class AIBidirectionalSystemClass {
             技能: stateForAI.角色?.技能,
           },
           社交: {
-            关系: stateForAI.社交?.关系,
+            关系: compactRelationsForPrompt(stateForAI.社交?.关系, stateForAI.角色?.位置?.描述),
             宗门: stateForAI.社交?.宗门,
             任务: stateForAI.社交?.任务,
             事件: stateForAI.社交?.事件,
