@@ -18,11 +18,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { getVideo, setVideo } from '@/utils/videoCache'
+import backgroundVideo from '@/assets/remote/background.mp4'
 
 const props = withDefaults(defineProps<{
   src?: string
 }>(), {
-  src: 'https://ddct.top/backgroundvedio.mp4'
+  src: backgroundVideo
 })
 
 const videoRef = ref<HTMLVideoElement>()

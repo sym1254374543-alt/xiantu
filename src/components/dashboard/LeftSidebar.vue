@@ -59,11 +59,11 @@
           <div class="cc-modal-body">
             <div class="sponsor-grid">
               <figure class="sponsor-qr">
-                <img src="https://ddct.top/zhifubao.jpg" :alt="t('支付宝赞助二维码')" loading="lazy" />
+                <img :src="zhifubaoQr" :alt="t('支付宝赞助二维码')" loading="lazy" />
                 <figcaption>{{ t('支付宝') }}</figcaption>
               </figure>
               <figure class="sponsor-qr">
-                <img src="https://ddct.top/weixing.jpg" :alt="t('微信赞助二维码')" loading="lazy" />
+                <img :src="weixinQr" :alt="t('微信赞助二维码')" loading="lazy" />
                 <figcaption>{{ t('微信') }}</figcaption>
               </figure>
             </div>
@@ -82,6 +82,8 @@ import { useCharacterStore } from '@/stores/characterStore';
 import { toast } from '@/utils/toast';
 import { useUIStore } from '@/stores/uiStore';
 import { useI18n } from '@/i18n';
+import zhifubaoQr from '@/assets/remote/zhifubao.jpg';
+import weixinQr from '@/assets/remote/weixing.jpg';
 
 const router = useRouter();
 const route = useRoute();

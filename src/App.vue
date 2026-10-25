@@ -168,11 +168,11 @@
           <p class="cc-hint sponsor-hint">完全自愿，不影响任何游戏内容。感谢道友护持仙途。</p>
           <div class="sponsor-grid">
             <figure class="sponsor-qr">
-              <img src="https://ddct.top/zhifubao.jpg" alt="支付宝赞助二维码" loading="lazy" />
+              <img :src="zhifubaoQr" alt="支付宝赞助二维码" loading="lazy" />
               <figcaption>支付宝</figcaption>
             </figure>
             <figure class="sponsor-qr">
-              <img src="https://ddct.top/weixing.jpg" alt="微信赞助二维码" loading="lazy" />
+              <img :src="weixinQr" alt="微信赞助二维码" loading="lazy" />
               <figcaption>微信</figcaption>
             </figure>
           </div>
@@ -234,6 +234,8 @@
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import $ from 'jquery'; // 导入 jQuery
+import zhifubaoQr from '@/assets/remote/zhifubao.jpg';
+import weixinQr from '@/assets/remote/weixing.jpg';
 import {
   BookOpen, X, Maximize2, Minimize2, Moon, Sun, Settings, Store, Globe, UserCircle, Heart, ArrowRight,
   Plug, FileText, Lightbulb, Dices, Sparkles, ScrollText, Save, Swords, Map as MapIcon, Trophy,

@@ -5,6 +5,15 @@
  * GitHub: github.com/qianye60 | Bilibili: space.bilibili.com/477576651
  */
 
+/* --- 自托管书法字体（不再依赖 Google Fonts） --- */
+@font-face {
+  font-family: 'Ma Shan Zheng';
+  src: url('./assets/fonts/MaShanZheng-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* --- Design Tokens (The Alchemist's Formula) --- */
 :root {
   /* --- Light Theme Colors (明亮版) --- */

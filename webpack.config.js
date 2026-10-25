@@ -45,39 +45,6 @@ export default (env, argv) => {
         '@': path.resolve(__dirname, 'src/'),
       },
     },
-    externals: [
-      ({ context, request }, callback) => {
-        if (!context || !request) {
-          return callback();
-        }
-
-        // 检查是否是本地文件引用
-        if (
-          request.startsWith('.') ||
-          request.startsWith('/') ||
-          path.isAbsolute(request)
-        ) {
-          return callback();
-        }
-
-        const builtin = {
-          jquery: '$',
-          lodash: '_',
-          toastr: 'toastr',
-          vue: 'Vue',
-          'vue-router': 'VueRouter',
-          yaml: 'YAML',
-          zod: 'z',
-        };
-
-        if (request in builtin) {
-          return callback(null, 'var ' + builtin[request]);
-        }
-
-        // 对于不在 builtin 列表中的其他npm包，正常打包，不作为外部依赖处理
-        return callback();
-      },
-    ],
     module: {
       rules: [
         {
@@ -98,12 +65,10 @@ export default (env, argv) => {
           use: ['style-loader', 'css-loader'],
         },
         {
-          test: /\.png$/i,
+          test: /\.(png|jpe?g|gif|webp|mp4|woff2?|ttf|otf)$/i,
           type: 'asset/resource',
           generator: {
             filename: 'assets/[name][ext]',
-            // 图标固定从云端站点取，酒馆/本地等相对路径环境下也不会 404
-            ...(isProduction ? { publicPath: 'https://www.ddct.top/' } : {}),
           },
         },
       ],
@@ -124,14 +89,7 @@ export default (env, argv) => {
         template: './index.html',
         inject: 'body',
         hash: isProduction,
-        templateParameters: {
-          vueScript: isProduction
-            ? 'https://unpkg.com/vue@3/dist/vue.global.prod.js'
-            : 'https://unpkg.com/vue@3/dist/vue.global.js',
-          vueRouterScript: isProduction
-            ? 'https://unpkg.com/vue-router@4/dist/vue-router.global.prod.js'
-            : 'https://unpkg.com/vue-router@4/dist/vue-router.global.js',
-        },
+        favicon: path.resolve(__dirname, 'favicon.ico'),
         minify: isProduction ? {
           removeComments: true,
           collapseWhitespace: true,
