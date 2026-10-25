@@ -44,6 +44,7 @@ import {
   SKILL_AND_SPELL_USAGE_RULES,
   ECONOMY_AND_PRICING_RULES,
   CULTIVATION_DETAIL_RULES,
+  TIME_FLOW_RULES,
   PERSISTENT_STATE_RULES
 } from '@/utils/prompts/definitions/businessRules';
 // 文本格式
@@ -123,6 +124,7 @@ const BUSINESS_RULES = [
   GRAND_CONCEPT_CONSTRAINTS,
   SKILL_AND_SPELL_USAGE_RULES,
   CULTIVATION_DETAIL_RULES,
+  TIME_FLOW_RULES,
   LOCATION_UPDATE_RULES,
   COMMAND_PATH_CONSTRUCTION_RULES,
   TECHNIQUE_SYSTEM_RULES,
@@ -202,7 +204,7 @@ const SPLIT_GENERATION_STEP2_PROMPT = `
 
 ## 同步清单（逐项对照第1步正文：发生了才写，没发生的不写）
 ### 基础
-□ 时间流逝 → 当前时间是本回合起点；同日短时段 add 元数据.时间.分钟（写本回合总耗时）；跨日/跨月/多时间段 set 元数据.时间 {年,月,日,小时,分钟} 为最后时间点（不能只写其中一段；修炼/闭关按实际总时长）
+□ 时间流逝 → 当前时间是本回合起点；推进尺度见[时间流速]；同日短时段 add 元数据.时间.分钟（写本回合总耗时）；跨日/跨月/多时间段 set 元数据.时间 {年,月,日,小时,分钟} 为最后时间点（不能只写其中一段；修炼/闭关按实际总时长）
 □ 位置变化 → set 角色.位置 {描述,x,y,灵气浓度}
 □ 现金变化 → add 角色.背包.货币.{币种ID}.数量（只可能是人民币/美元/欧元）
 □ 银行卡变化 → add 角色.银行.余额.{币种ID}（**存钱进卡为正、取钱/刷卡消费为负**；现金同时反向变动）；灵石绝不入卡
