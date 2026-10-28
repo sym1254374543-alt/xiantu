@@ -180,6 +180,16 @@ export function calculateInitialAttributes(baseInfo: CharacterBaseInfo, age: num
 // #region 角色初始化 - 辅助函数
 // =================================================================
 
+/** 现代/现实世界取世界年份；纯架空世界退回用年龄当年份 */
+function resolveInitialYear(baseInfo: CharacterBaseInfo, age: number): number {
+  const world = baseInfo.世界;
+  const text = `${world?.name || ''} ${world?.era || ''} ${world?.description || ''}`;
+  const yearMatch = text.match(/(?:19|20)\d{2}/);
+  if (yearMatch) return Number(yearMatch[0]);
+  if (/真实地球|现代|都市|灵气复苏|地球/.test(text)) return 2026;
+  return age;
+}
+
 /**
  * 准备初始存档数据结构
  * @param baseInfo - 角色
@@ -203,9 +213,9 @@ function prepareInitialData(baseInfo: CharacterBaseInfo, age: number): { saveDat
   }
 
 
-  // 🔥 修复：时间使用age作为初始年份，确保出生日期为0年
-  // AI会在初始化响应中通过tavern_commands设置正确的时间（如果需要）
-  const 临时时间 = { 年: age, 月: 1, 日: 1, 小时: Math.floor(Math.random() * 12) + 6, 分钟: Math.floor(Math.random() * 60) };
+  // 现代/现实世界用其年份（如 2026）；纯架空世界才退回用年龄当年份
+  const initialYear = resolveInitialYear(baseInfo, age);
+  const 临时时间 = { 年: initialYear, 月: 1, 日: 1, 小时: Math.floor(Math.random() * 12) + 6, 分钟: Math.floor(Math.random() * 60) };
 
   // 计算出生日期：时间 - 开局年龄 = 出生年份
   // 例如：开局年龄18岁，时间18年，则出生日期为0年
@@ -269,8 +279,8 @@ function prepareInitialData(baseInfo: CharacterBaseInfo, age: number): { saveDat
     属性: attributes as any,
     位置: location as any,
     效果: [],
-    // 🔥 时间：使用age作为初始年份，AI可以通过tavern_commands修改
-    时间: { 年: age, 月: 1, 日: 1, 小时: Math.floor(Math.random() * 12) + 6, 分钟: Math.floor(Math.random() * 60) },
+    // 时间：现代世界用世界年份；纯架空世界才用年龄当年份
+    时间: { ...临时时间 },
     背包: { 灵石: { 下品: 0, 中品: 0, 上品: 0, 极品: 0 }, 物品: {} },
     装备: { 装备1: null, 装备2: null, 装备3: null, 装备4: null, 装备5: null, 装备6: null },
     功法: {
