@@ -646,11 +646,12 @@ const currentNarrative = computed(() => {
   const shortTermMemory = gameStateStore.memory?.短期记忆;
   const currentTimeString = formatCurrentTime();
 
-  // 优先从短期记忆获取文本内容
+  // 优先从短期记忆获取文本内容；【世界事件】是系统事件，不是本回合正文，跳过
   let content = '';
-  if (shortTermMemory && shortTermMemory.length > 0) {
+  const narrativeMemories = (shortTermMemory || []).filter((m) => !String(m).includes('【世界事件】'));
+  if (narrativeMemories.length > 0) {
     // 短期记忆使用push添加，最新的在末尾
-    const latestMemory = shortTermMemory[shortTermMemory.length - 1];
+    const latestMemory = narrativeMemories[narrativeMemories.length - 1];
     content = latestMemory.replace(/^【.*?】\s*/, ''); // 移除时间前缀
   } else if (narrativeHistory && narrativeHistory.length > 0) {
     // 回退到叙事历史

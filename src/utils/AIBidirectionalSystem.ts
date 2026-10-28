@@ -393,22 +393,10 @@ class AIBidirectionalSystemClass {
         storeEventSystem.下次事件时间 = scheduled;
       }
 
-      // 把事件文本写入“短期记忆”，并作为本回合注入文本，保证主游戏流程可承接“刚刚发生”的事件
+      // 事件只注入本回合提示词；不要写进短期记忆——主界面会把短期记忆最后一条当成正文显示。
+      // 事件本身已写入 社交.事件.事件记录，下回合仍会随游戏状态发给 AI。
       const memoryEntry = `${this._formatGameTime(now)}【世界事件】${generated.prompt_addition}`;
       shortTermMemoryForPrompt.push(memoryEntry);
-
-      // 同步落盘：将事件快照写入存档短期记忆（否则下回合不会带上这段“刚刚发生”的承接文本）
-      if (!v3.社交) v3.社交 = {};
-      if (!v3.社交.记忆 || typeof v3.社交.记忆 !== 'object') v3.社交.记忆 = { 短期记忆: [], 中期记忆: [], 长期记忆: [] };
-      if (!Array.isArray(v3.社交.记忆.短期记忆)) v3.社交.记忆.短期记忆 = [];
-      v3.社交.记忆.短期记忆.push(memoryEntry);
-
-      if (gameStateStore.memory && typeof gameStateStore.memory === 'object') {
-        const nextMemory = cloneDeep(gameStateStore.memory) as any;
-        if (!Array.isArray(nextMemory.短期记忆)) nextMemory.短期记忆 = [];
-        nextMemory.短期记忆.push(memoryEntry);
-        gameStateStore.updateState('memory', nextMemory);
-      }
 
       // 酒馆端：若触发了“特殊NPC登场”，立刻存档一次，确保人物关系与事件快照不丢失
       if (npcToAdd && npcToAdd.名字 && isTavernEnv()) {
@@ -3090,9 +3078,14 @@ ${text}`;
       ? `\n上一条记录开始于：${this._formatGameTime(lastStart)}`
         + `\n上一条记录所在回合跨度：${this._formatGameTimeSpan(lastStart, nowTime)}（历时 ${formatElapsedMinutes(diffGameTimeMinutes(lastStart, nowTime))}）`
       : '';
+    const storyEntries = shortTermMemory.filter((m) => !String(m).includes('【世界事件】'));
+    const eventEntries = shortTermMemory.filter((m) => String(m).includes('【世界事件】'));
+    const eventBlock = eventEntries.length
+      ? `\n\n# 【世界事件】（系统生成，不是上一回合正文；本回合承接它，但不要当成主角已做的事照抄）\n${eventEntries.join('\n')}`
+      : '';
     return {
       content: `# 【最近事件】
-${shortTermMemory.join('\n')}
+${storyEntries.join('\n')}${eventBlock}
 ${nowText ? `\n本回合起点(上回合结束时间)：${nowText}` : ''}${lastLine}
 
 以上是最近发生的剧情，每条开头的【】是该回合的开始时间；回合内经历了多久、分几段，写在记录正文的时间线里。
