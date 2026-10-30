@@ -126,6 +126,18 @@
                 <h4 class="gm-label">人格底线</h4>
                 <div class="chips"><span v-for="b in bottomLines(selected)" :key="b" class="gm-chip bad">{{ b }}</span></div>
               </section>
+              <section class="gm-section">
+                <h4 class="gm-label">关系网</h4>
+                <dl v-if="matrixRelations.length" class="gm-kv nd-kv">
+                  <template v-for="r in matrixRelations" :key="r.other">
+                    <dt>{{ r.other }}</dt>
+                    <dd>
+                      <span v-if="r.oneway" class="gm-muted">{{ r.arrow }} </span>{{ r.relation }}<span v-if="r.score !== null" class="gm-muted"> · {{ r.score }}</span><span v-if="r.events.length" class="gm-muted" :title="r.events.join('；')"> · {{ r.events.length }}件事</span>
+                    </dd>
+                  </template>
+                </dl>
+                <p v-else class="gm-muted">与其他 NPC 暂无往来记录（视为不认识）。</p>
+              </section>
             </template>
 
             <!-- 风华：仅酒馆 -->
@@ -360,6 +372,31 @@ const clearFilters = () => {
 const selectedName = ref('');
 const detailOpen = ref(false);
 const selected = computed(() => allNpcs.value.find((n) => n.名字 === selectedName.value) || null);
+
+// ─── 关系矩阵：某人认识谁、关系如何 ───
+const matrixEdges = computed<any[]>(() => {
+  const m: any = (gs as any).relationshipMatrix;
+  return Array.isArray(m?.edges) ? m.edges : [];
+});
+const matrixRelations = computed(() => {
+  const name = selected.value?.名字;
+  if (!name) return [];
+  return matrixEdges.value
+    .filter((e) => e && (e.from === name || e.to === name))
+    .map((e) => {
+      const other = e.from === name ? e.to : e.from;
+      const oneway = e.type === '单向';
+      return {
+        other: String(other || ''),
+        relation: String(e.relation || '相识'),
+        score: typeof e.score === 'number' ? e.score : null,
+        oneway,
+        arrow: e.from === name ? '→' : '←',
+        events: Array.isArray(e.events) ? e.events.filter((x: unknown) => typeof x === 'string') : [],
+      };
+    })
+    .filter((r) => r.other);
+});
 
 const select = (name: string) => {
   selectedName.value = name;

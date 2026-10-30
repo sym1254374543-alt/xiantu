@@ -49,6 +49,13 @@ import {
 } from '@/utils/prompts/definitions/businessRules';
 // 文本格式
 import { TEXT_FORMAT_MARKERS, DICE_ROLLING_RULES, NAMING_CONVENTIONS } from '@/utils/prompts/definitions/textFormats';
+// 判定系统关闭时使用的整套提示词（开关打开时不参与）
+import {
+  CORE_OUTPUT_RULES_NO_JUDGEMENT,
+  BUSINESS_RULES_NO_JUDGEMENT,
+  TEXT_FORMAT_RULES_NO_JUDGEMENT,
+  EXTENDED_BUSINESS_RULES_NO_JUDGEMENT
+} from '@/utils/prompts/definitions/noJudgementPrompts';
 // 世界标准
 import { REALM_ATTRIBUTE_STANDARDS, QUALITY_SYSTEM, REPUTATION_GUIDE } from '@/utils/prompts/definitions/worldStandards';
 import { ACTION_OPTIONS_RULES } from '@/utils/prompts/definitions/actionOptions';
@@ -184,6 +191,11 @@ const SPLIT_GENERATION_STEP1_PROMPT = `
 - 输出 text 以外的字段（mid_term_memory / tavern_commands / action_options）
 - 正文里出现指令、变量名或JSON路径
 `.trim();
+
+// 判定关闭版：去掉「## 判定」整节（其余与原版逐字一致）
+const SPLIT_GENERATION_STEP1_PROMPT_NO_JUDGEMENT = SPLIT_GENERATION_STEP1_PROMPT
+  .replace(/## 判定[\s\S]*?(?=## 禁止)/, '')
+  .trim();
 
 const SPLIT_GENERATION_STEP2_PROMPT = `
 # 分步生成 2/2：只生成数据指令
@@ -390,6 +402,14 @@ export function getSystemPrompts(): Record<string, PromptDefinition> {
       order: 1,
       weight: 10
     },
+    coreOutputRulesNoJudgement: {
+      name: '1b. 输出格式（判定关闭）',
+      content: CORE_OUTPUT_RULES_NO_JUDGEMENT,
+      category: 'coreRequest',
+      description: '关闭判定系统时使用；与原版只差「叙事纯净」里的判定要求',
+      order: 1.1,
+      weight: 10,
+    },
     businessRules: {
       name: '2. 核心规则',
       content: BUSINESS_RULES,
@@ -397,6 +417,14 @@ export function getSystemPrompts(): Record<string, PromptDefinition> {
       description: '境界、大道、NPC、位置、战斗等核心规则',
       order: 2,
       weight: 9
+    },
+    businessRulesNoJudgement: {
+      name: '2b. 核心规则（判定关闭）',
+      content: BUSINESS_RULES_NO_JUDGEMENT,
+      category: 'coreRequest',
+      description: '关闭判定系统时使用：不含难度表与〔〕判定，改为按存档变量综合判断结果',
+      order: 2.1,
+      weight: 9,
     },
     styleNarrative: {
       name: '文风',
@@ -423,6 +451,14 @@ export function getSystemPrompts(): Record<string, PromptDefinition> {
       weight: 5,
       defaultEnabled: false
     },
+    extendedBusinessRulesNoJudgement: {
+      name: '2.6 扩展规则（判定关闭）',
+      content: EXTENDED_BUSINESS_RULES_NO_JUDGEMENT,
+      category: 'coreRequest',
+      description: '关闭判定时使用的扩展规则；是否发送跟随「2.5 扩展规则」开关。只去掉玩家宗门内容，其他势力与关系网络照常',
+      order: 2.6,
+      weight: 5
+    },
     dataDefinitions: {
       name: '3. 数据结构',
       content: getSaveDataStructureForEnv({
@@ -442,6 +478,14 @@ export function getSystemPrompts(): Record<string, PromptDefinition> {
       description: '判定、伤害、命名',
       order: 4,
       weight: 10
+    },
+    textFormatRulesNoJudgement: {
+      name: '4b. 文本格式（判定关闭）',
+      content: TEXT_FORMAT_RULES_NO_JUDGEMENT,
+      category: 'coreRequest',
+      description: '关闭判定系统时使用：只保留标记与命名，不含〔〕判定格式',
+      order: 4.1,
+      weight: 10,
     },
     worldStandards: {
       name: '5. 世界标准',
@@ -476,6 +520,15 @@ export function getSystemPrompts(): Record<string, PromptDefinition> {
       order: 9,
       weight: 7,
       condition: 'splitGeneration'
+    },
+    splitGenerationStep1NoJudgement: {
+      name: '9b. 分步正文（判定关闭）',
+      content: SPLIT_GENERATION_STEP1_PROMPT_NO_JUDGEMENT,
+      category: 'coreRequest',
+      description: '关闭判定系统时的分步第1步：不含判定小节',
+      order: 9.1,
+      weight: 7,
+      condition: 'splitGeneration',
     },
     splitGenerationStep2: {
       name: '10. 分步指令',

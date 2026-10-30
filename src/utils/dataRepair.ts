@@ -17,6 +17,7 @@ import { isSaveDataV3, migrateSaveDataToLatest } from '@/utils/saveMigration';
 import { validateSaveDataV3 } from '@/utils/saveValidationV3';
 import { normalizeBackpackCurrencies, migrateSpiritStonesToItems, normalizeBankCard } from '@/utils/currencySystem';
 import { guardEntityDomains, guardFactionRealm, guardWorldLocationFields } from '@/utils/valueGuard';
+import { compactNarrativeHistoryLogs } from '@/utils/stateChangeLog';
 
 /**
  * 修复并清洗存档数据，确保所有必需字段存在且格式正确
@@ -218,7 +219,9 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
         to: string;
         relation?: string;
         score?: number;
+        type?: '单向' | '双向';
         tags?: string[];
+        events?: string[];
         updatedAt?: string;
       }> = [];
 
@@ -236,6 +239,8 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
         const relation = normalizeString((item as any).relation) || undefined;
         const score = typeof (item as any).score === 'number' && Number.isFinite((item as any).score) ? (item as any).score : undefined;
         const tags = normalizeStringArray((item as any).tags);
+        const type = (item as any).type === '单向' ? '单向' : (item as any).type === '双向' ? '双向' : undefined;
+        const events = normalizeStringArray((item as any).events).slice(0, 30);
         const updatedAt = normalizeString((item as any).updatedAt) || undefined;
 
         edges.push({
@@ -243,7 +248,9 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
           to,
           relation,
           score,
+          type,
           tags: tags.length ? tags : undefined,
+          events: events.length ? events : undefined,
           updatedAt,
         });
         if (edges.length >= 2000) break;
@@ -270,6 +277,8 @@ export function repairSaveData(saveData: SaveData | null | undefined): SaveData 
     if (!repaired.系统 || typeof repaired.系统 !== 'object') repaired.系统 = createMinimalSaveDataV3().系统;
     if (!repaired.系统.历史 || typeof repaired.系统.历史 !== 'object') repaired.系统.历史 = { 叙事: [] };
     if (!Array.isArray(repaired.系统.历史.叙事)) repaired.系统.历史.叙事 = [];
+    // 旧存档自愈：变更日志里的正文副本压成摘要（叙事正文本身不动，导出不受影响）
+    compactNarrativeHistoryLogs(repaired.系统.历史.叙事);
 
     // --- 角色子模块最小化补全 ---
     if (!repaired.角色.大道 || typeof repaired.角色.大道 !== 'object') repaired.角色.大道 = { 大道列表: {} };

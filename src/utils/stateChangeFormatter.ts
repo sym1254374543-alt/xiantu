@@ -307,8 +307,8 @@ function parseRelationshipChange(change: StateChange): FormattedChange | null {
       };
     }
 
-    // 人物记忆新增
-    if (field === '人物记忆' && action === 'push') {
+    // 人物记忆新增（路径是 社交.关系.X.记忆；旧日志字段名写作 人物记忆）
+    if ((field === '人物记忆' || field === '记忆') && action === 'push') {
       // 提取记忆内容
       let memoryContent = '新增了关于你的记忆';
       if (newValue) {
@@ -423,6 +423,18 @@ function parseGenericChange(change: StateChange): FormattedChange {
         `指令内容:\n${command}`,
         `\n错误原因:\n${errorMessage}`,
       ],
+    };
+  }
+
+  // 🔥 特殊处理：叙事正文的 push（正文全文在 系统.历史.叙事[].content，日志里只留摘要）
+  if (key.includes('系统.历史.叙事') && action === 'push') {
+    const content = isObject(newValue) ? (newValue as any).content : undefined;
+    const preview = typeof content === 'string' && content ? content : '新增一段正文';
+    return {
+      icon: 'add',
+      color: 'blue',
+      title: '新增叙事',
+      description: preview.length > 60 ? preview.substring(0, 60) + '...' : preview,
     };
   }
 

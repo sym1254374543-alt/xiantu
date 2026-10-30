@@ -28,6 +28,9 @@ import { RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS, NARRATIVE_PURITY_RULE
 import { NPC_KNOWLEDGE_BOUNDARY_RULES, PERSISTENT_STATE_RULES } from '@/utils/prompts/definitions/businessRules';
 import { isSaveDataV3, migrateSaveDataToLatest } from './saveMigration';
 import { parseJsonSmart } from '@/utils/jsonExtract';
+import { compactStateChangeLog } from '@/utils/stateChangeLog';
+import { isJudgementSystemEnabled } from '@/utils/promptModeSettings';
+import { NARRATIVE_PURITY_RULES_NO_JUDGEMENT, NPC_KNOWLEDGE_BOUNDARY_RULES_NJ, PERSISTENT_STATE_RULES_NJ, OUTCOME_JUDGEMENT_RULES } from '@/utils/prompts/definitions/noJudgementPrompts';
 import { diag } from '@/utils/diagnostics';
 import type { APIUsageType } from '@/stores/apiManagementStore';
 import { buildJudgementRound, formatJudgementBlock } from '@/utils/judgement';
@@ -703,7 +706,7 @@ class AIBidirectionalSystemClass {
         存档: stateForAI,  // 传入存档，用于读取天赋技能加成/灵根/天资/功法
         对手列表: Object.values(stateForAI.社交?.关系 || {}),  // NPC，用于对等的战斗难度
       });
-      coreStatusSummary += `\n\n${formatJudgementBlock(judgementRound)}`;
+      // 判定块只经 judgementInject（depth 1，紧贴玩家输入）发送一次，不再拼进状态速览
       // --- 结束 ---
 
       // 🔥 构建精简版存档数据（用于叙事判定，减少token消耗）
@@ -728,6 +731,7 @@ class AIBidirectionalSystemClass {
           },
           社交: {
             关系: compactRelationsForPrompt(stateForAI.社交?.关系, stateForAI.角色?.位置?.描述),
+            关系矩阵: stateForAI.社交?.关系矩阵,
             宗门: stateForAI.社交?.宗门,
             任务: stateForAI.社交?.任务,
             事件: stateForAI.社交?.事件,
@@ -743,6 +747,9 @@ class AIBidirectionalSystemClass {
       // 发给 AI 前剥掉纯冗余的英文镜像键（不动 stateForAI 本身：判定/关注NPC等还在用它）
       const stateJsonString = JSON.stringify(toPromptState(buildNarrativeState()));
 
+      // 判定系统开关：关闭时不注入判定块，并改用另一套内置提示词（原提示词不受影响）
+      const judgementEnabled = isJudgementSystemEnabled();
+
       const activePrompts: string[] = [];
       if (actionOptionsEnabled) {
         activePrompts.push('actionOptions');
@@ -755,7 +762,7 @@ class AIBidirectionalSystemClass {
       const shortTermMemoryForPrompt = Array.isArray(shortTermMemory) ? [...shortTermMemory] : [];
       await this.maybeTriggerScheduledWorldEvent({ v3, stateForAI, shortTermMemoryForPrompt });
 
-      const assembledPrompt = await assembleSystemPrompt(activePrompts, uiStore.actionOptionsPrompt, stateForAI);
+      const assembledPrompt = await assembleSystemPrompt(activePrompts, uiStore.actionOptionsPrompt, stateForAI, { judgementEnabled });
 
       const midTermFormat = readMemoryFormatSetting('midTermFormat');
       const focusedNpcPrompt = this.buildFocusedNpcPrompt(stateForAI)
@@ -807,7 +814,7 @@ ${stateJsonString}
         // 无关注NPC且无中期记忆格式时为空串，过滤掉避免注入空消息
         ...(focusedNpcPrompt.trim() ? [{ content: focusedNpcPrompt, role: 'system' as const, depth: 3, position: 'in_chat' as const }] : []),
         ...(recentEventsInject ? [recentEventsInject] : []),
-        judgementInject,
+        ...(judgementEnabled ? [judgementInject] : []),
         INPUT_GUARD_INJECT,
       ];
 
@@ -823,9 +830,9 @@ ${stateJsonString}
           if (step === 1) {
             // 第1步：只输出正文纯文本，不需要JSON格式和指令相关的提示词
             const [stepRulesRaw, worldStandardsPrompt, textFormatsPrompt, styleNarrativePrompt, playerPersonalityPrompt] = await Promise.all([
-              getPrompt('splitGenerationStep1'),
+              getPrompt(judgementEnabled ? 'splitGenerationStep1' : 'splitGenerationStep1NoJudgement'),
               getPrompt('worldStandards'),
-              getPrompt('textFormatRules'),
+              getPrompt(judgementEnabled ? 'textFormatRules' : 'textFormatRulesNoJudgement'),
               getPrompt('styleNarrative'),
               getPrompt('playerPersonality'),
             ]);
@@ -844,14 +851,18 @@ ${styleBlock ? `\n\n---\n\n${styleBlock}` : ''}
 
 ---
 
-${NARRATIVE_PURITY_RULES}
+${judgementEnabled ? NARRATIVE_PURITY_RULES : NARRATIVE_PURITY_RULES_NO_JUDGEMENT}
+${judgementEnabled ? '' : `
+---
 
+${OUTCOME_JUDGEMENT_RULES}
+`}
 ---
 
 # 认知边界与当前形态（正文必须遵守）
-${NPC_KNOWLEDGE_BOUNDARY_RULES}
+${judgementEnabled ? NPC_KNOWLEDGE_BOUNDARY_RULES : NPC_KNOWLEDGE_BOUNDARY_RULES_NJ}
 
-${PERSISTENT_STATE_RULES}
+${judgementEnabled ? PERSISTENT_STATE_RULES : PERSISTENT_STATE_RULES_NJ}
 
 ---
 
@@ -876,10 +887,10 @@ ${narrativeStateJson}
           // 第2步：COT + 指令生成（合并），需要结构与业务规则
           // 注意：不要注入 coreOutputRules（它会要求输出 text，和第2步“禁止text”冲突）
           const [businessRulesPrompt, extendedRulesPrompt, dataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt] = await Promise.all([
-            getPrompt('businessRules'),
+            getPrompt(judgementEnabled ? 'businessRules' : 'businessRulesNoJudgement'),
             getPrompt('extendedBusinessRules'),
             getPrompt('dataDefinitions'),
-            getPrompt('textFormatRules'),
+            getPrompt(judgementEnabled ? 'textFormatRules' : 'textFormatRulesNoJudgement'),
             getPrompt('worldStandards')
           ]);
 
@@ -899,8 +910,12 @@ ${narrativeStateJson}
           const sections: string[] = [stepRules, RESPONSE_FORMAT_RULES, DATA_STRUCTURE_STRICTNESS];
 
           const sanitizedBusinessRulesPrompt = contentSettings.nsfwMode ? businessRulesPrompt : stripNsfwContent(businessRulesPrompt);
-          const sanitizedExtendedRulesPrompt = contentSettings.nsfwMode ? extendedRulesPrompt : stripNsfwContent(extendedRulesPrompt);
-          sections.push(sanitizedBusinessRulesPrompt, sanitizedExtendedRulesPrompt, sanitizedDataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt);
+          const extendedRulesEffective = judgementEnabled
+            ? (contentSettings.nsfwMode ? extendedRulesPrompt : stripNsfwContent(extendedRulesPrompt))
+            : extendedRulesPrompt.trim()
+              ? await getPrompt('extendedBusinessRulesNoJudgement')
+              : '';
+          sections.push(sanitizedBusinessRulesPrompt, extendedRulesEffective, sanitizedDataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt);
 
           if (actionOptionsEnabled) {
             const actionOptionsPrompt = await getPrompt('actionOptions');
@@ -938,7 +953,7 @@ ${stateJsonString}
           { content: await buildSplitSystemPrompt(1), role: 'system', depth: 4, position: 'in_chat' },
           // 只在第1步注入最近事件，避免重复
           ...(recentEventsInject ? [recentEventsInject] : []),
-          judgementInject,
+          ...(judgementEnabled ? [judgementInject] : []),
           INPUT_GUARD_INJECT,
         ];
         let step1Text = '';
@@ -1771,7 +1786,9 @@ ${step1Text}
     }
 
     // 🔥 将状态变更添加到最新的叙事记录中
-    const stateChangesLog: StateChangeLog = { changes, timestamp: new Date().toISOString() };
+    // 日志只用于「变更」弹窗，正文已存在 叙事[].content；这里压掉副本，
+    // 否则每回合会把整篇正文（以及整段 NPC 记忆数组）再存一遍。
+    const stateChangesLog: StateChangeLog = compactStateChangeLog({ changes, timestamp: new Date().toISOString() });
     if ((saveData as any).系统?.历史?.叙事 && (saveData as any).系统.历史.叙事.length > 0) {
       const latestNarrative = (saveData as any).系统.历史.叙事[(saveData as any).系统.历史.叙事.length - 1];
       (latestNarrative as any).stateChanges = stateChangesLog;

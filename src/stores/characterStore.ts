@@ -2020,6 +2020,8 @@ export const useCharacterStore = defineStore('characterV3', () => {
    * @param characterUpdates 角色数据更新
    */
   const updateCharacterData = async (stateChanges: StateChangeLog) => {
+    // ⚠️ 目前无调用方。stateChanges 里的 oldValue/newValue 可能是 stateChangeLog.ts 压过的摘要，
+    // 不是原始值——若要启用本函数回放，必须改用 AIBidirectionalSystem.processGmResponse 返回的 saveData。
     const active = rootState.value.当前激活存档;
     const profile = activeCharacterProfile.value;
     const save = activeSaveSlot.value;

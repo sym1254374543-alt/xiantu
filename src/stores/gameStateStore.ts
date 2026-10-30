@@ -95,9 +95,13 @@ function normalizeRelationshipMatrixV3(raw: unknown, npcNames: string[]): any | 
     const tags = Array.isArray((e as any).tags)
       ? (e as any).tags.filter((t: any) => typeof t === 'string' && t.trim()).slice(0, 12)
       : undefined;
+    const type = (e as any).type === '单向' ? '单向' : (e as any).type === '双向' ? '双向' : undefined;
+    const events = Array.isArray((e as any).events)
+      ? (e as any).events.filter((t: any) => typeof t === 'string' && t.trim()).slice(0, 30)
+      : undefined;
     const updatedAt = typeof (e as any).updatedAt === 'string' ? (e as any).updatedAt : undefined;
 
-    edges.push({ from, to, relation, score, tags, updatedAt });
+    edges.push({ from, to, relation, score, type, tags, events, updatedAt });
     if (edges.length >= 2000) break;
   }
 

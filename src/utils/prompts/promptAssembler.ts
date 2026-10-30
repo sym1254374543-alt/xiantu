@@ -3,6 +3,7 @@ import { stripNsfwContent, augmentDataDefinitionsPrompt } from './definitions/da
 import { getContentSettings } from '@/utils/nsfw';
 import { IMAGE_PROMPT_RULES } from '@/services/imagePlaceholders';
 import { resolveImageApi } from '@/services/storyImageRunner';
+import { isJudgementSystemEnabled } from '@/utils/promptModeSettings';
 
 /**
  * 组装最终的系统Prompt（异步版本，支持自定义提示词）
@@ -15,8 +16,11 @@ import { resolveImageApi } from '@/services/storyImageRunner';
 export async function assembleSystemPrompt(
   activePrompts: string[],
   customActionPrompt?: string,
-  gameState?: any
+  gameState?: any,
+  options?: { judgementEnabled?: boolean }
 ): Promise<string> {
+  // 关闭判定系统时改用另一套内置提示词（与原版共用其他模块，互不影响）
+  const judgementEnabled = options?.judgementEnabled ?? isJudgementSystemEnabled();
   // 所有提示词都使用 getPrompt() 获取，支持用户自定义
   const [
     coreRulesPrompt,
@@ -30,17 +34,24 @@ export async function assembleSystemPrompt(
     splendorRulesPrompt,
     nsfwRulesPrompt
   ] = await Promise.all([
-    getPrompt('coreOutputRules'),
-    getPrompt('businessRules'),
+    getPrompt(judgementEnabled ? 'coreOutputRules' : 'coreOutputRulesNoJudgement'),
+    getPrompt(judgementEnabled ? 'businessRules' : 'businessRulesNoJudgement'),
     getPrompt('extendedBusinessRules'), // 默认关闭，停用时为空字符串
     getPrompt('playerPersonality'),
     getPrompt('styleNarrative'),
     getPrompt('dataDefinitions'),
-    getPrompt('textFormatRules'),
+    getPrompt(judgementEnabled ? 'textFormatRules' : 'textFormatRulesNoJudgement'),
     getPrompt('worldStandards'),
     getPrompt('splendorRules'),
     getPrompt('nsfwRules')
   ]);
+
+  // 判定关闭时：扩展规则改用无判定版本（是否发送跟随「2.5 扩展规则」的开关）
+  const extendedRulesEffective = judgementEnabled
+    ? extendedBusinessRulesPrompt
+    : extendedBusinessRulesPrompt.trim()
+      ? await getPrompt('extendedBusinessRulesNoJudgement')
+      : '';
 
   const contentSettings = getContentSettings(gameState?.系统?.配置);
   const sanitize = (prompt: string) => (contentSettings.nsfwMode ? prompt : stripNsfwContent(prompt));
@@ -60,7 +71,7 @@ export async function assembleSystemPrompt(
     // 2. 业务规则
     sanitizedBusinessRulesPrompt,
     // 2.5 扩展规则（可选）
-    sanitize(extendedBusinessRulesPrompt),
+    sanitize(extendedRulesEffective),
     // 文风（可预设 / 自定义）
     styleNarrativePrompt,
     // 2.1 主角性格（可预设 / 自定义）

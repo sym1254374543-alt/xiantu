@@ -54,7 +54,11 @@ export interface RelationshipEdgeV3 {
   to: string;
   relation?: string;
   score?: number;
+  /** 单向/双向；省略按双向处理 */
+  type?: '单向' | '双向';
   tags?: string[];
+  /** 该关系的关键事件（如拜师、结仇） */
+  events?: string[];
   updatedAt?: string;
 }
 

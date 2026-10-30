@@ -163,7 +163,7 @@ export const OPEN_STATUS_ALIASES: Record<string, string> = {
 export const NPC_RELATION_TO_PLAYER = ['陌生人', '相识', '朋友', '挚友', '师徒', '同门', '上下级', '道侣', '竞争', '仇敌'] as const
 
 /** NPC 关系网 关系矩阵.edges.relation */
-export const RELATION_MATRIX_TYPES = ['师徒', '道侣', '仇敌', '盟友', '竞争', '暗恋', '血亲', '同门', '上下级', '债务', '恩情'] as const
+export const RELATION_MATRIX_TYPES = ['相识', '师徒', '道侣', '仇敌', '盟友', '竞争', '暗恋', '血亲', '同门', '上下级', '债务', '恩情'] as const
 /** 关系矩阵.edges.type */
 export const RELATION_MATRIX_DIRECTIONS = ['单向', '双向'] as const
 

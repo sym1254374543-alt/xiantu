@@ -295,6 +295,17 @@
 
             <div class="row">
               <div class="row-info">
+                <label class="row-name" for="setting-judgement">{{ t('判定系统') }}</label>
+                <span class="row-desc">{{ t('开启：按基础值与难度表结算并写〔〕判定；关闭：改由 AI 依据天赋、境界、属性、大道、环境、关系等综合判断结果，不再输出判定标记') }}</span>
+              </div>
+              <label class="switch">
+                <input id="setting-judgement" v-model="settings.judgementSystemEnabled" type="checkbox" />
+                <span></span>
+              </label>
+            </div>
+
+            <div class="row">
+              <div class="row-info">
                 <label class="row-name" for="setting-protection">{{ t('存档保护强度') }}</label>
                 <span class="row-desc">{{ t('控制AI指令的保护/拒绝力度；更低更自由，但更容易产生坏存档') }}</span>
               </div>
@@ -557,6 +568,7 @@ const settings = reactive({
   fastAnimations: false,
   splitResponseGeneration: false,  // 默认关闭分步生成
   realmLayeredMap: false, // 境界分层地图开关
+  judgementSystemEnabled: true, // 判定系统开关：关闭后改用无判定的另一套提示词
 
   // 🔞 成人内容（仅酒馆环境可用；非酒馆环境将被忽略/隐藏）
   enableNsfwMode: true,
@@ -730,6 +742,10 @@ const validateSettings = () => {
       (settings as any).splitResponseGeneration = false;  // 默认关闭分步生成
     }
 
+    if (typeof (settings as any).judgementSystemEnabled !== 'boolean') {
+      (settings as any).judgementSystemEnabled = true;  // 判定系统默认开启
+    }
+
     // 正则替换规则：确保结构正确并限制大小，避免卡顿/存储膨胀
     const rawReplaceRules = (settings as any).replaceRules;
     (settings as any).replaceRules = normalizeReplaceRules(rawReplaceRules);
@@ -821,6 +837,7 @@ const resetSettings = async () => {
     narrativeLeading: DEFAULT_LEADING,
     fastAnimations: false,
     splitResponseGeneration: false,  // 默认关闭分步生成
+    judgementSystemEnabled: true,  // 判定系统默认开启
     debugMode: false,
     consoleDebug: false,
     performanceMonitor: false,
