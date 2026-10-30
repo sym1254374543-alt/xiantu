@@ -1200,6 +1200,7 @@ ${gmResponse.text}
 
       if (settings.splitEnabled) {
         const buildInitialSplitSystemPrompt = async (step: 1 | 2): Promise<string> => {
+          const judgementEnabled = isJudgementSystemEnabled();
           if (step === 1) {
             // 第1步：只输出正文，不需要JSON格式和指令相关的提示词
             const stepRules = (await getPrompt('splitInitStep1')).trim();
@@ -1212,7 +1213,7 @@ ${stepRules}${imageRules}
 
 ---
 
-${NARRATIVE_PURITY_RULES}
+${judgementEnabled ? NARRATIVE_PURITY_RULES : NARRATIVE_PURITY_RULES_NO_JUDGEMENT}
 
 ---
 
@@ -1230,10 +1231,10 @@ ${userPrompt}
           const contentSettings = getContentSettings();
           const stepRules = (await getPrompt('splitInitStep2')).trim();
           const [businessRulesPrompt, extendedRulesPrompt, dataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt, bodyInitRulesPrompt, splendorInitRulesPrompt, nsfwBodyInitRulesPrompt] = await Promise.all([
-            getPrompt('businessRules'),
+            getPrompt(judgementEnabled ? 'businessRules' : 'businessRulesNoJudgement'),
             getPrompt('extendedBusinessRules'),
             getPrompt('dataDefinitions'),
-            getPrompt('textFormatRules'),
+            getPrompt(judgementEnabled ? 'textFormatRules' : 'textFormatRulesNoJudgement'),
             getPrompt('worldStandards'),
             getPrompt('bodyInitRules'),
             getPrompt('splendorInitRules'),
@@ -1262,8 +1263,12 @@ ${userPrompt}
             sections.push(nsfwBodyInitRulesPrompt.trim());
           }
 
-          const sanitizedExtendedRulesPrompt = contentSettings.nsfwMode ? extendedRulesPrompt : stripNsfwContent(extendedRulesPrompt);
-          sections.push(sanitizedBusinessRulesPrompt, sanitizedExtendedRulesPrompt, sanitizedDataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt);
+          const extendedRulesEffective = judgementEnabled
+            ? (contentSettings.nsfwMode ? extendedRulesPrompt : stripNsfwContent(extendedRulesPrompt))
+            : extendedRulesPrompt.trim()
+              ? await getPrompt('extendedBusinessRulesNoJudgement')
+              : '';
+          sections.push(sanitizedBusinessRulesPrompt, extendedRulesEffective, sanitizedDataDefinitionsPrompt, textFormatsPrompt, worldStandardsPrompt);
           return sections.map(s => s.trim()).filter(Boolean).join('\n\n---\n\n').trim();
         };
 
