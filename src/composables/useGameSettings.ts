@@ -28,6 +28,7 @@ export interface GameSettings {
   narrativeSize: number;
   narrativeLeading: NarrativeLeading;
   realmLayeredMap: boolean;
+  judgementSystemEnabled: boolean;
   debugMode: boolean;
   consoleDebug: boolean;
   performanceMonitor: boolean;
@@ -42,6 +43,7 @@ const defaults = (): GameSettings => ({
   narrativeSize: DEFAULT_NARRATIVE_SIZE,
   narrativeLeading: DEFAULT_LEADING,
   realmLayeredMap: false,
+  judgementSystemEnabled: true,
   debugMode: false,
   consoleDebug: false,
   performanceMonitor: false,
@@ -100,6 +102,7 @@ export function useGameSettings() {
       narrativeSize: clamp(s.narrativeSize, 14, 22, d.narrativeSize),
       narrativeLeading: ['tight', 'normal', 'loose'].includes(s.narrativeLeading as string) ? s.narrativeLeading : d.narrativeLeading,
       realmLayeredMap: s.realmLayeredMap === true,
+      judgementSystemEnabled: s.judgementSystemEnabled !== false,
       debugMode: s.debugMode === true,
       consoleDebug: s.consoleDebug === true,
       performanceMonitor: s.performanceMonitor === true,

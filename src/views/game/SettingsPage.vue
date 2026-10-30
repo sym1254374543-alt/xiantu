@@ -173,6 +173,16 @@
         </section>
 
         <section class="card">
+          <div class="c-row">
+            <div>
+              <h4 class="c-name">判定系统</h4>
+              <p class="c-desc">开启：按基础值与难度表结算并写〔〕判定；关闭：由 AI 依据天赋、境界、属性、大道、环境、关系等综合判断结果，不再输出判定标记</p>
+            </div>
+            <label class="gm-switch"><input v-model="set.judgementSystemEnabled" type="checkbox" aria-label="判定系统" /><span></span></label>
+          </div>
+        </section>
+
+        <section class="card">
           <h4 class="c-name">存档保护强度</h4>
           <p class="c-desc">控制 AI 指令的保护和拒绝力度；越低越自由，但更容易产生坏存档</p>
           <div class="gm-seg" role="radiogroup" aria-label="存档保护强度">
